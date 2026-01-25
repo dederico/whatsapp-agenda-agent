@@ -7,6 +7,8 @@ services:
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
     rootDir: .
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: ENV
         value: prod
       - key: API_KEY_INTERNAL
