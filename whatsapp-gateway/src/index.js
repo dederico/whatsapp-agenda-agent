@@ -1,7 +1,7 @@
 const { config } = require('dotenv');
 const Hapi = require('@hapi/hapi');
 const QRCode = require('qrcode');
-const { initWhatsApp, sendMessage, getLastQr } = require('./whatsapp');
+const { initWhatsApp, sendMessage, getLastQr, clearAuth } = require('./whatsapp');
 
 config();
 
@@ -47,6 +47,19 @@ server.route({
     const { to_number, text } = request.payload;
     await sendMessage(to_number, text);
     return { status: 'sent' };
+  },
+});
+
+server.route({
+  method: 'POST',
+  path: '/reset-auth',
+  handler: async (request) => {
+    const apiKey = request.headers['x-api-key'];
+    if (!apiKey || apiKey !== process.env.API_KEY) {
+      return { error: 'unauthorized' };
+    }
+    const ok = clearAuth();
+    return { status: ok ? 'cleared' : 'failed' };
   },
 });
 

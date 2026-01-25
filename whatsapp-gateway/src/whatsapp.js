@@ -15,10 +15,11 @@ const extractText = (message) => {
 
 let sock = null;
 let lastQr = null;
+let authRoot = null;
 
 const initWhatsApp = async () => {
-  const authPath = process.env.AUTH_PATH || '/var/data/baileys';
-  const { state, saveCreds } = await useMultiFileAuthState(authPath);
+  authRoot = process.env.AUTH_PATH || '/var/data/baileys';
+  const { state, saveCreds } = await useMultiFileAuthState(authRoot);
   const { version } = await fetchLatestBaileysVersion();
 
   sock = makeWASocket({
@@ -36,7 +37,7 @@ const initWhatsApp = async () => {
       const reason = update?.lastDisconnect?.error?.output?.payload?.reason;
       if (reason === 'conflict' || reason === 'device_removed') {
         try {
-          fs.rmSync(path.join(authPath, 'creds.json'), { force: true });
+          fs.rmSync(path.join(authRoot, 'creds.json'), { force: true });
         } catch {
           // ignore
         }
@@ -79,4 +80,17 @@ const sendMessage = async (toNumber, text) => {
 
 const getLastQr = () => lastQr;
 
-module.exports = { initWhatsApp, sendMessage, getLastQr };
+const clearAuth = () => {
+  if (!authRoot) {
+    return false;
+  }
+  try {
+    fs.rmSync(authRoot, { recursive: true, force: true });
+    lastQr = null;
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+module.exports = { initWhatsApp, sendMessage, getLastQr, clearAuth };
