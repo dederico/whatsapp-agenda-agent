@@ -1,6 +1,4 @@
-import * as baileys from 'baileys';
-
-const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
+import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 
 const extractText = (message) => {
   if (!message) return '';
