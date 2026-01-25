@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: Agente-Agenda-Calendario-Api
+    env: python
+    plan: starter
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    rootDir: .
+    envVars:
+      - key: ENV
+        value: prod
+      - key: API_KEY_INTERNAL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: WHATSAPP_GATEWAY_URL
+        sync: false
+      - key: WHATSAPP_GATEWAY_API_KEY
+        sync: false
+      - key: OWNER_WHATSAPP_NUMBER
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_TOKEN_PATH
+        value: /var/data/token.json
+      - key: GOOGLE_SCOPES
+        value: https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar
+      - key: GMAIL_POLL_MINUTES
+        value: "5"
+    disk:
+      name: google-token
+      mountPath: /var/data
+      sizeGB: 1
+
+  - type: web
+    name: Agente-Agenda-Calendario
+    env: node
+    plan: starter
+    buildCommand: cd whatsapp-gateway && npm install
+    startCommand: node whatsapp-gateway/src/index.js
+    rootDir: .
+    envVars:
+      - key: API_KEY
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: PORT
+        value: "3001"
+    disk:
+      name: whatsapp-auth
+      mountPath: /var/data
+      sizeGB: 1
