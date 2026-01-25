@@ -1,6 +1,6 @@
 const { config } = require('dotenv');
 const Hapi = require('@hapi/hapi');
-const { initWhatsApp, sendMessage } = require('./whatsapp');
+const { initWhatsApp, sendMessage, getLastQr } = require('./whatsapp');
 
 config();
 
@@ -18,7 +18,7 @@ server.route({
 server.route({
   method: 'GET',
   path: '/qr',
-  handler: () => ({ status: 'pending' }),
+  handler: () => ({ qr: getLastQr() }),
 });
 
 server.route({

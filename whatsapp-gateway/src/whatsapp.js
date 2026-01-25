@@ -12,6 +12,7 @@ const extractText = (message) => {
 };
 
 let sock = null;
+let lastQr = null;
 
 const initWhatsApp = async () => {
   const authPath = process.env.AUTH_PATH || '/var/data/baileys';
@@ -25,6 +26,11 @@ const initWhatsApp = async () => {
   });
 
   sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('connection.update', (update) => {
+    if (update.qr) {
+      lastQr = update.qr;
+    }
+  });
 
   sock.ev.on('messages.upsert', async (m) => {
     const msg = m.messages?.[0];
@@ -59,4 +65,6 @@ const sendMessage = async (toNumber, text) => {
   await sock.sendMessage(jid, { text });
 };
 
-module.exports = { initWhatsApp, sendMessage };
+const getLastQr = () => lastQr;
+
+module.exports = { initWhatsApp, sendMessage, getLastQr };
