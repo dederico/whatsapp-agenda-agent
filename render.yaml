@@ -54,6 +54,8 @@ services:
         sync: false
       - key: BACKEND_URL
         sync: false
+      - key: AUTH_PATH
+        value: /var/data/baileys
       - key: PORT
         value: "3001"
     disk:

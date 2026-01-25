@@ -1,4 +1,6 @@
-import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion } from 'baileys';
+import * as baileys from 'baileys';
+
+const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = baileys;
 
 const extractText = (message) => {
   if (!message) return '';
@@ -13,7 +15,8 @@ const extractText = (message) => {
 let sock = null;
 
 export const initWhatsApp = async () => {
-  const { state, saveCreds } = await useMultiFileAuthState('auth');
+  const authPath = process.env.AUTH_PATH || '/var/data/baileys';
+  const { state, saveCreds } = await useMultiFileAuthState(authPath);
   const { version } = await fetchLatestBaileysVersion();
 
   sock = makeWASocket({
