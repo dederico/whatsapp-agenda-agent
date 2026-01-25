@@ -1,5 +1,7 @@
 const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } =
   require('@whiskeysockets/baileys');
+const fs = require('fs');
+const path = require('path');
 
 const extractText = (message) => {
   if (!message) return '';
@@ -29,6 +31,16 @@ const initWhatsApp = async () => {
   sock.ev.on('connection.update', (update) => {
     if (update.qr) {
       lastQr = update.qr;
+    }
+    if (update.connection === 'close') {
+      const reason = update?.lastDisconnect?.error?.output?.payload?.reason;
+      if (reason === 'conflict' || reason === 'device_removed') {
+        try {
+          fs.rmSync(path.join(authPath, 'creds.json'), { force: true });
+        } catch {
+          // ignore
+        }
+      }
     }
   });
 
