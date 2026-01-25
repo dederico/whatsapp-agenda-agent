@@ -1,3 +1,6 @@
+const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } =
+  require('@whiskeysockets/baileys');
+
 const extractText = (message) => {
   if (!message) return '';
   return (
@@ -10,22 +13,7 @@ const extractText = (message) => {
 
 let sock = null;
 
-const loadBaileys = async () => {
-  const mod = await import('@whiskeysockets/baileys');
-  const makeWASocket = mod.default || mod.makeWASocket || mod.default?.makeWASocket;
-  const useMultiFileAuthState = mod.useMultiFileAuthState || mod.default?.useMultiFileAuthState;
-  const fetchLatestBaileysVersion =
-    mod.fetchLatestBaileysVersion || mod.default?.fetchLatestBaileysVersion;
-
-  if (!makeWASocket || !useMultiFileAuthState || !fetchLatestBaileysVersion) {
-    throw new Error('Baileys exports not found');
-  }
-  return { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion };
-};
-
-export const initWhatsApp = async () => {
-  const { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } =
-    await loadBaileys();
+const initWhatsApp = async () => {
   const authPath = process.env.AUTH_PATH || '/var/data/baileys';
   const { state, saveCreds } = await useMultiFileAuthState(authPath);
   const { version } = await fetchLatestBaileysVersion();
@@ -63,10 +51,12 @@ export const initWhatsApp = async () => {
   });
 };
 
-export const sendMessage = async (toNumber, text) => {
+const sendMessage = async (toNumber, text) => {
   if (!sock) {
     throw new Error('WhatsApp not initialized');
   }
   const jid = `${toNumber}@s.whatsapp.net`;
   await sock.sendMessage(jid, { text });
 };
+
+module.exports = { initWhatsApp, sendMessage };

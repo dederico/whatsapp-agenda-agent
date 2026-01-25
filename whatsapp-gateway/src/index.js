@@ -1,6 +1,6 @@
-import { config } from 'dotenv';
-import Hapi from '@hapi/hapi';
-import { initWhatsApp, sendMessage } from './whatsapp.js';
+const { config } = require('dotenv');
+const Hapi = require('@hapi/hapi');
+const { initWhatsApp, sendMessage } = require('./whatsapp');
 
 config();
 
