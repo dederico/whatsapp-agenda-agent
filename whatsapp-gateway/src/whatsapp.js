@@ -7,6 +7,15 @@ let lastQr = null;
 let tokenFolder = null;
 
 const getFromNumber = (message) => {
+  const from = message?.from;
+  if (from && typeof from === 'string') {
+    if (from.includes('status@broadcast') || from.endsWith('@g.us')) {
+      return undefined;
+    }
+    if (from.endsWith('@c.us')) {
+      return from.split('@')[0];
+    }
+  }
   const senderUser = message?.sender?.id?.user;
   if (senderUser && typeof senderUser === 'string') {
     return senderUser;
@@ -14,10 +23,6 @@ const getFromNumber = (message) => {
   const author = message?.author;
   if (author && typeof author === 'string') {
     return author.split('@')[0];
-  }
-  const from = message?.from;
-  if (from && typeof from === 'string') {
-    return from.split('@')[0];
   }
   return undefined;
 };
@@ -65,9 +70,6 @@ const initWhatsApp = async () => {
       return;
     }
     if (message.isGroupMsg) {
-      return;
-    }
-    if (typeof message.from === 'string' && message.from.includes('status@broadcast')) {
       return;
     }
     const from = getFromNumber(message);
