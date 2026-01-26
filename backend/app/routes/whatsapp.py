@@ -43,6 +43,10 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
     command = parse_command(message.text)
     user_key = owner
     pending = state.get_pending(user_key)
+    state.log_event(
+        "whatsapp.command",
+        f"intent={command.intent} pending={pending.status if pending else 'none'} text={message.text}",
+    )
 
     if command.intent == "ignore":
         if not pending:

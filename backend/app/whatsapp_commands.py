@@ -14,11 +14,11 @@ class ParsedCommand:
 
 def parse_command(text: str) -> ParsedCommand:
     clean = (text or "").strip().lower()
-    if clean in {"ignorar", "ignora", "ignore"}:
+    if clean in {"ignorar", "ignora", "ignore"} or "ignorar" in clean or "ignora" in clean:
         return ParsedCommand(intent="ignore", payload={"raw": text})
-    if clean in {"contestar", "responder", "responde"}:
+    if clean in {"contestar", "responder", "responde"} or "contestar" in clean or "responder" in clean:
         return ParsedCommand(intent="reply", payload={"raw": text})
-    if clean in {"enviar", "manda", "mandar"}:
+    if clean in {"enviar", "manda", "mandar"} or "enviar" in clean or "manda" in clean:
         return ParsedCommand(intent="send", payload={"raw": text})
     if clean in {"si", "sí", "ok", "dale", "va", "enviar", "envia", "envíalo"}:
         return ParsedCommand(intent="confirm", payload={"raw": text})
