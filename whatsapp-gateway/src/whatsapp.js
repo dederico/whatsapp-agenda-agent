@@ -85,7 +85,12 @@ const clearAuth = () => {
 };
 
 const findChromiumExecutable = () => {
-  const candidates = ['/var/data/puppeteer', '/opt/render/.cache/puppeteer'];
+  const candidates = [
+    process.env.PUPPETEER_CACHE_DIR,
+    '/opt/render/project/src/whatsapp-gateway/.cache/puppeteer',
+    '/opt/render/.cache/puppeteer',
+    '/var/data/puppeteer',
+  ].filter(Boolean);
   for (const base of candidates) {
     try {
       const chromeDir = path.join(base, 'chrome');
