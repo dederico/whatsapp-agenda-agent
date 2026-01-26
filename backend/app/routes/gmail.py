@@ -10,6 +10,13 @@ from ..schemas import OutgoingWhatsAppMessage
 router = APIRouter()
 gateway = WhatsAppGateway()
 
+def _normalize_number(raw: str) -> str:
+    # Strip non-digits and normalize MX mobile (52/521) prefixes.
+    digits = "".join(ch for ch in (raw or "") if ch.isdigit())
+    if digits.startswith("521") and len(digits) == 13:
+        return "52" + digits[3:]
+    return digits
+
 
 async def poll_and_notify():
     gmail = GmailClient()
@@ -33,7 +40,7 @@ async def poll_and_notify():
         subject=subject,
         summary=summary,
     )
-    state.set_pending(settings.owner_whatsapp_number, pending)
+    state.set_pending(_normalize_number(settings.owner_whatsapp_number), pending)
     state.log_event("email.new", f"From {sender} - {subject}")
 
     await gateway.send_message(

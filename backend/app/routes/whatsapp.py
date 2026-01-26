@@ -11,24 +11,35 @@ router = APIRouter()
 gateway = WhatsAppGateway()
 
 
+def _normalize_number(raw: str) -> str:
+    # Strip non-digits and normalize MX mobile (52/521) prefixes.
+    digits = "".join(ch for ch in (raw or "") if ch.isdigit())
+    if digits.startswith("521") and len(digits) == 13:
+        return "52" + digits[3:]
+    return digits
+
+
 @router.post("/whatsapp/incoming")
 async def whatsapp_incoming(message: IncomingWhatsAppMessage):
-    if message.from_number != settings.owner_whatsapp_number:
+    owner = _normalize_number(settings.owner_whatsapp_number)
+    incoming = _normalize_number(message.from_number)
+    if not owner or incoming != owner:
         raise HTTPException(status_code=403, detail="unauthorized")
 
     command = parse_command(message.text)
-    pending = state.get_pending(message.from_number)
+    user_key = owner
+    pending = state.get_pending(user_key)
 
     if command.intent == "ignore":
         if not pending:
             return {"status": "no_pending"}
         pending.status = "ignored"
         GmailClient().archive_message(pending.action_id)
-        state.clear_pending(message.from_number)
+        state.clear_pending(user_key)
         state.log_event("email.ignore", f"Archived email {pending.action_id}")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
-                to_number=message.from_number,
+                to_number=settings.owner_whatsapp_number,
                 text="Listo, archivé el correo.",
             )
         )
@@ -41,7 +52,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         state.log_event("email.reply.start", f"Drafting reply to {pending.sender}")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
-                to_number=message.from_number,
+                to_number=settings.owner_whatsapp_number,
                 text="Perfecto. Dicta tu respuesta breve y yo preparo el borrador.",
             )
         )
@@ -52,11 +63,11 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
             return {"status": "no_draft"}
         pending.status = "approved"
         GmailClient().send_reply(pending.sender, f"Re: {pending.subject}", pending.draft_reply)
-        state.clear_pending(message.from_number)
+        state.clear_pending(user_key)
         state.log_event("email.sent", f"Sent reply to {pending.sender}")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
-                to_number=message.from_number,
+                to_number=settings.owner_whatsapp_number,
                 text="Enviado. Si quieres agregar seguimiento, dímelo.",
             )
         )
@@ -65,11 +76,11 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
     if command.intent == "cancel":
         if not pending:
             return {"status": "no_pending"}
-        state.clear_pending(message.from_number)
+        state.clear_pending(user_key)
         state.log_event("email.cancel", "Cancelled pending reply")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
-                to_number=message.from_number,
+                to_number=settings.owner_whatsapp_number,
                 text="Cancelado. No enviaré respuesta.",
             )
         )
@@ -80,7 +91,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         state.log_event("email.draft", "Draft prepared")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
-                to_number=message.from_number,
+                to_number=settings.owner_whatsapp_number,
                 text=(
                     "Tengo este borrador:\n\n"
                     f"{pending.draft_reply}\n\n"
