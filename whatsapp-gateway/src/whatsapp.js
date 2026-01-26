@@ -9,8 +9,10 @@ let tokenFolder = null;
 const initWhatsApp = async () => {
   tokenFolder = process.env.WPP_TOKEN_FOLDER || '/var/data/wpp';
 
+  const envExec = process.env.PUPPETEER_EXECUTABLE_PATH;
   const executablePath =
-    process.env.PUPPETEER_EXECUTABLE_PATH || findChromiumExecutable();
+    (envExec && isExecutableFile(envExec) ? envExec : undefined) ||
+    findChromiumExecutable();
   const useChrome = !executablePath;
   client = await wppconnect.create({
     session: 'agenda-agent',
@@ -114,6 +116,15 @@ const findChromiumExecutable = () => {
     }
   }
   return undefined;
+};
+
+const isExecutableFile = (filePath) => {
+  try {
+    const stat = fs.statSync(filePath);
+    return stat.isFile();
+  } catch {
+    return false;
+  }
 };
 
 module.exports = { initWhatsApp, sendMessage, getLastQr, clearAuth };
