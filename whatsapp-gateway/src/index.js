@@ -30,7 +30,8 @@ server.route({
     if (!qr) {
       return h.response('no-qr').code(404);
     }
-    const png = await QRCode.toBuffer(qr, { type: 'png' });
+    const dataUrl = `data:image/png;base64,${qr}`;
+    const png = await QRCode.toBuffer(dataUrl, { type: 'png' });
     return h.response(png).type('image/png');
   },
 });

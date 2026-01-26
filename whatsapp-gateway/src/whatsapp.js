@@ -1,57 +1,41 @@
-const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } =
-  require('@whiskeysockets/baileys');
+const wppconnect = require('@wppconnect-team/wppconnect');
 const fs = require('fs');
 const path = require('path');
 
-const extractText = (message) => {
-  if (!message) return '';
-  return (
-    message.conversation ||
-    message.extendedTextMessage?.text ||
-    message.imageMessage?.caption ||
-    ''
-  );
-};
-
-let sock = null;
+let client = null;
 let lastQr = null;
-let authRoot = null;
+let tokenFolder = null;
 
 const initWhatsApp = async () => {
-  authRoot = process.env.AUTH_PATH || '/var/data/baileys';
-  const { state, saveCreds } = await useMultiFileAuthState(authRoot);
-  const { version } = await fetchLatestBaileysVersion();
+  tokenFolder = process.env.WPP_TOKEN_FOLDER || '/var/data/wpp';
 
-  sock = makeWASocket({
-    version,
-    auth: state,
-    printQRInTerminal: true,
-  });
-
-  sock.ev.on('creds.update', saveCreds);
-  sock.ev.on('connection.update', (update) => {
-    if (update.qr) {
-      lastQr = update.qr;
-    }
-    if (update.connection === 'close') {
-      const reason = update?.lastDisconnect?.error?.output?.payload?.reason;
-      if (reason === 'conflict' || reason === 'device_removed') {
-        try {
-          fs.rmSync(path.join(authRoot, 'creds.json'), { force: true });
-        } catch {
-          // ignore
-        }
+  client = await wppconnect.create({
+    session: 'agenda-agent',
+    catchQR: (base64Qr) => {
+      const parts = base64Qr.split(',');
+      if (parts.length > 1) {
+        lastQr = parts[1];
       }
-    }
+    },
+    statusFind: (statusSession) => {
+      if (statusSession === 'isLogged') {
+        lastQr = null;
+      }
+    },
+    folderNameToken: tokenFolder,
+    headless: true,
+    logQR: true,
   });
 
-  sock.ev.on('messages.upsert', async (m) => {
-    const msg = m.messages?.[0];
-    if (!msg || msg.key?.fromMe) {
+  client.onMessage(async (message) => {
+    if (!message?.body || message?.fromMe) {
       return;
     }
-    const from = msg.key?.remoteJid?.split('@')[0];
-    const text = extractText(msg.message);
+    if (message.isGroupMsg) {
+      return;
+    }
+    const from = message.from?.split('@')[0];
+    const text = message.body;
     if (!from || !text) {
       return;
     }
@@ -71,21 +55,21 @@ const initWhatsApp = async () => {
 };
 
 const sendMessage = async (toNumber, text) => {
-  if (!sock) {
+  if (!client) {
     throw new Error('WhatsApp not initialized');
   }
-  const jid = `${toNumber}@s.whatsapp.net`;
-  await sock.sendMessage(jid, { text });
+  const jid = `${toNumber}@c.us`;
+  await client.sendText(jid, text);
 };
 
 const getLastQr = () => lastQr;
 
 const clearAuth = () => {
-  if (!authRoot) {
+  if (!tokenFolder) {
     return false;
   }
   try {
-    fs.rmSync(authRoot, { recursive: true, force: true });
+    fs.rmSync(path.resolve(tokenFolder), { recursive: true, force: true });
     lastQr = null;
     return true;
   } catch {

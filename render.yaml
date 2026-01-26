@@ -46,6 +46,7 @@ services:
     name: Agente-Agenda-Calendario
     env: node
     plan: starter
+    nodeVersion: 20.18.1
     buildCommand: cd whatsapp-gateway && npm install
     startCommand: node whatsapp-gateway/src/index.js
     rootDir: .
@@ -54,8 +55,10 @@ services:
         sync: false
       - key: BACKEND_URL
         sync: false
-      - key: AUTH_PATH
-        value: /var/data/baileys
+      - key: WPP_TOKEN_FOLDER
+        value: /var/data/wpp
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: "false"
       - key: PORT
         value: "3001"
     disk:
