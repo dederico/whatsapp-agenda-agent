@@ -32,6 +32,16 @@ const initWhatsApp = async () => {
     logQR: true,
     autoClose: 0,
     ...(useChrome ? { useChrome: true } : { executablePath }),
+    puppeteerOptions: {
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-zygote',
+        '--single-process',
+      ],
+    },
   });
 
   client.onMessage(async (message) => {
