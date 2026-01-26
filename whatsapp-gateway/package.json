@@ -6,7 +6,6 @@
   },
   "dependencies": {
     "@hapi/hapi": "21.3.9",
-    "qrcode": "1.5.4",
     "dotenv": "16.4.5",
     "@wppconnect-team/wppconnect": "1.38.0",
     "puppeteer": "23.11.1"

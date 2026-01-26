@@ -1,6 +1,5 @@
 const { config } = require('dotenv');
 const Hapi = require('@hapi/hapi');
-const QRCode = require('qrcode');
 const { initWhatsApp, sendMessage, getLastQr, clearAuth } = require('./whatsapp');
 
 config();
@@ -30,8 +29,7 @@ server.route({
     if (!qr) {
       return h.response('no-qr').code(404);
     }
-    const dataUrl = `data:image/png;base64,${qr}`;
-    const png = await QRCode.toBuffer(dataUrl, { type: 'png' });
+    const png = Buffer.from(qr, 'base64');
     return h.response(png).type('image/png');
   },
 });
