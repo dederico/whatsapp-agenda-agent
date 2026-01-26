@@ -28,7 +28,7 @@ async def status():
         html.append("<div>")
         for ev in events:
             html.append(
-                f\"<div class='evt'><span class='tag'>{ev['ts']} · {ev['kind']}</span><br/>{ev['detail']}</div>\"
+                f"<div class='evt'><span class='tag'>{ev['ts']} · {ev['kind']}</span><br/>{ev['detail']}</div>"
             )
         html.append("</div>")
     html.append("</body></html>")
