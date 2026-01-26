@@ -15,6 +15,9 @@ const getFromNumber = (message) => {
     if (from.endsWith('@c.us')) {
       return from.split('@')[0];
     }
+    if (from.endsWith('@lid')) {
+      return from.split('@')[0];
+    }
   }
   const senderUser = message?.sender?.id?.user;
   if (senderUser && typeof senderUser === 'string') {
