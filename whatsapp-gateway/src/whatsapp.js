@@ -6,6 +6,22 @@ let client = null;
 let lastQr = null;
 let tokenFolder = null;
 
+const getFromNumber = (message) => {
+  const senderUser = message?.sender?.id?.user;
+  if (senderUser && typeof senderUser === 'string') {
+    return senderUser;
+  }
+  const author = message?.author;
+  if (author && typeof author === 'string') {
+    return author.split('@')[0];
+  }
+  const from = message?.from;
+  if (from && typeof from === 'string') {
+    return from.split('@')[0];
+  }
+  return undefined;
+};
+
 const initWhatsApp = async () => {
   tokenFolder = process.env.WPP_TOKEN_FOLDER || '/var/data/wpp';
 
@@ -51,7 +67,10 @@ const initWhatsApp = async () => {
     if (message.isGroupMsg) {
       return;
     }
-    const from = message.from?.split('@')[0];
+    if (typeof message.from === 'string' && message.from.includes('status@broadcast')) {
+      return;
+    }
+    const from = getFromNumber(message);
     const text = message.body;
     if (!from || !text) {
       return;
