@@ -9,7 +9,8 @@ let tokenFolder = null;
 const initWhatsApp = async () => {
   tokenFolder = process.env.WPP_TOKEN_FOLDER || '/var/data/wpp';
 
-  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+  const executablePath =
+    process.env.PUPPETEER_EXECUTABLE_PATH || findChromiumExecutable();
   const useChrome = !executablePath;
   client = await wppconnect.create({
     session: 'agenda-agent',
@@ -79,6 +80,40 @@ const clearAuth = () => {
   } catch {
     return false;
   }
+};
+
+const findChromiumExecutable = () => {
+  const candidates = ['/var/data/puppeteer', '/opt/render/.cache/puppeteer'];
+  for (const base of candidates) {
+    try {
+      const chromeDir = path.join(base, 'chrome');
+      const platforms = fs
+        .readdirSync(chromeDir, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name);
+      for (const platform of platforms) {
+        const platformDir = path.join(chromeDir, platform);
+        const versions = fs
+          .readdirSync(platformDir, { withFileTypes: true })
+          .filter((d) => d.isDirectory())
+          .map((d) => d.name);
+        for (const version of versions) {
+          const execPath = path.join(
+            platformDir,
+            version,
+            'chrome-linux64',
+            'chrome'
+          );
+          if (fs.existsSync(execPath)) {
+            return execPath;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return undefined;
 };
 
 module.exports = { initWhatsApp, sendMessage, getLastQr, clearAuth };
