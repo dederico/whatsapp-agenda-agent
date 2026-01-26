@@ -10,6 +10,7 @@ const initWhatsApp = async () => {
   tokenFolder = process.env.WPP_TOKEN_FOLDER || '/var/data/wpp';
 
   const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+  const useChrome = !executablePath;
   client = await wppconnect.create({
     session: 'agenda-agent',
     catchQR: (base64Qr) => {
@@ -27,7 +28,7 @@ const initWhatsApp = async () => {
     headless: true,
     logQR: true,
     autoClose: 0,
-    executablePath,
+    ...(useChrome ? { useChrome: true } : { executablePath }),
   });
 
   client.onMessage(async (message) => {
