@@ -66,10 +66,15 @@ const initWhatsApp = async () => {
   });
 
   client.onMessage(async (message) => {
+    console.error(
+      `[agenda-agent] MSG raw from=${message?.from} sender=${message?.sender?.id?.user} author=${message?.author} fromMe=${message?.fromMe} isGroup=${message?.isGroupMsg} body=${message?.body}`
+    );
     if (!message?.body || message?.fromMe) {
+      console.error('[agenda-agent] MSG ignored (empty body or fromMe)');
       return;
     }
     if (message.isGroupMsg) {
+      console.error('[agenda-agent] MSG ignored (group)');
       return;
     }
     const from = getFromNumber(message);
