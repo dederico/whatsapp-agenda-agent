@@ -82,7 +82,9 @@ const initWhatsApp = async () => {
       console.warn('[agenda-agent] BACKEND_URL not set, skipping webhook');
       return;
     }
+    console.log(`[agenda-agent] inbound msg from=${from} text=${text}`);
     try {
+      console.log(`[agenda-agent] POST ${backendUrl}/whatsapp/incoming`);
       const res = await fetch(`${backendUrl}/whatsapp/incoming`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -96,6 +98,8 @@ const initWhatsApp = async () => {
         console.warn(
           `[agenda-agent] webhook failed ${res.status} ${res.statusText}: ${body}`
         );
+      } else {
+        console.log('[agenda-agent] webhook delivered');
       }
     } catch (err) {
       console.error('[agenda-agent] webhook error', err);
