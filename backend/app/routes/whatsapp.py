@@ -163,7 +163,19 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
     if command.intent == "create_event":
         raw = command.payload.get("raw", "")
         ai = AIClient(settings.openai_api_key)
-        draft = await ai.parse_event(raw, settings.scheduler_timezone)
+        try:
+            draft = await ai.parse_event(raw, settings.scheduler_timezone)
+        except ValueError:
+            await gateway.send_message(
+                OutgoingWhatsAppMessage(
+                    to_number=settings.owner_whatsapp_number,
+                    text=(
+                        "No pude entender el evento. Intenta: "
+                        "'crear evento mañana 6am llamado LEVANTARSE en casa'."
+                    ),
+                )
+            )
+            return {"status": "parse_failed"}
         payload = {
             "summary": draft.title,
             "location": draft.location,

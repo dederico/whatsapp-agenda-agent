@@ -51,6 +51,10 @@ class AIClient:
             data = json.loads(raw)
         except json.JSONDecodeError:
             data = {}
+        if not isinstance(data, dict):
+            data = {}
+        if "title" not in data or "start" not in data:
+            raise ValueError("missing_required_fields")
         draft = CalendarEventDraft(**data)
         if not draft.end:
             try:
