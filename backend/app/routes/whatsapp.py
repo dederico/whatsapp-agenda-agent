@@ -24,12 +24,18 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
     owner = _normalize_number(settings.owner_whatsapp_number)
     incoming = _normalize_number(message.from_number)
     state.log_event("whatsapp.incoming", f"from={message.from_number} norm={incoming}")
-    if not owner or incoming != owner:
+    is_lid = len(incoming) > 13
+    if not owner or (incoming != owner and not is_lid):
         state.log_event(
             "whatsapp.unauthorized",
             f"from={message.from_number} norm={incoming} owner={owner}",
         )
         raise HTTPException(status_code=403, detail="unauthorized")
+    if incoming != owner and is_lid:
+        state.log_event(
+            "whatsapp.lid",
+            f"from={message.from_number} norm={incoming} owner={owner}",
+        )
 
     command = parse_command(message.text)
     user_key = owner
