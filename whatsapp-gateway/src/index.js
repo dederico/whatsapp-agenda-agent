@@ -65,9 +65,9 @@ server.route({
 });
 
 const start = async () => {
-  await initWhatsApp();
   await server.start();
   console.log(`WhatsApp gateway running on ${server.info.uri}`);
+  await initWhatsApp();
 };
 
 start();
