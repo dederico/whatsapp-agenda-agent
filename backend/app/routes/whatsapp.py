@@ -1,9 +1,12 @@
 from fastapi import APIRouter, HTTPException
+from datetime import datetime, timedelta
 
 from ..config import settings
 from ..schemas import IncomingWhatsAppMessage, OutgoingWhatsAppMessage
 from ..services.whatsapp_gateway import WhatsAppGateway
 from ..services.gmail import GmailClient
+from ..services.calendar import CalendarClient
+from ..services.ai import AIClient
 from ..state import state
 from ..whatsapp_commands import parse_command
 
@@ -123,6 +126,59 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
             )
         )
         return {"status": "cancelled"}
+
+    if command.intent == "agenda":
+        cal = CalendarClient()
+        now = datetime.utcnow()
+        end = now + timedelta(days=1)
+        events = await cal.list_events(now, end, max_results=5)
+        if not events:
+            await gateway.send_message(
+                OutgoingWhatsAppMessage(
+                    to_number=settings.owner_whatsapp_number,
+                    text="No tienes eventos próximos en 24h.",
+                )
+            )
+            return {"status": "no_events"}
+        lines = []
+        for ev in events:
+            summary = ev.get("summary", "(sin título)")
+            start = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date")
+            location = ev.get("location")
+            when = start or "sin hora"
+            extra = f" · {location}" if location else ""
+            lines.append(f"- {summary} · {when}{extra}")
+        await gateway.send_message(
+            OutgoingWhatsAppMessage(
+                to_number=settings.owner_whatsapp_number,
+                text="Próximos eventos:\n" + "\n".join(lines),
+            )
+        )
+        return {"status": "events_sent"}
+
+    if command.intent == "create_event":
+        raw = command.payload.get("raw", "")
+        ai = AIClient(settings.openai_api_key)
+        draft = await ai.parse_event(raw, settings.scheduler_timezone)
+        payload = {
+            "summary": draft.title,
+            "location": draft.location,
+            "description": draft.notes,
+            "start": {"dateTime": draft.start},
+            "end": {"dateTime": draft.end or draft.start},
+        }
+        if draft.attendees:
+            payload["attendees"] = [{"email": a} for a in draft.attendees]
+        cal = CalendarClient()
+        created = await cal.create_event(payload)
+        state.log_event("calendar.create", f"{created.get('summary')} @ {created.get('start')}")
+        await gateway.send_message(
+            OutgoingWhatsAppMessage(
+                to_number=settings.owner_whatsapp_number,
+                text=f"Listo, agendé: {created.get('summary')}.",
+            )
+        )
+        return {"status": "created"}
 
     if pending and pending.status == "drafting":
         pending.draft_reply = message.text.strip()

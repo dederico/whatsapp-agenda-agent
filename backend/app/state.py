@@ -19,6 +19,8 @@ class InMemoryState:
     def __init__(self):
         self.pending_by_user: Dict[str, PendingEmailAction] = {}
         self.events = deque(maxlen=200)
+        self.reminders_sent: set[str] = set()
+        self.last_reco_date: str | None = None
 
     def set_pending(self, user_number: str, action: PendingEmailAction):
         self.pending_by_user[user_number] = action
@@ -38,6 +40,11 @@ class InMemoryState:
                 "detail": detail,
             }
         )
+
+    def mark_reminder_sent(self, key: str):
+        if len(self.reminders_sent) > 2000:
+            self.reminders_sent.clear()
+        self.reminders_sent.add(key)
 
 
 state = InMemoryState()

@@ -24,6 +24,10 @@ def parse_command(text: str) -> ParsedCommand:
         return ParsedCommand(intent="confirm", payload={"raw": text})
     if clean in {"no", "nel", "nope", "no enviar", "no lo envíes", "no lo envies"}:
         return ParsedCommand(intent="reject", payload={"raw": text})
+    if clean in {"agenda", "próximos", "proximos", "calendario"}:
+        return ParsedCommand(intent="agenda", payload={"raw": text})
+    if clean.startswith("crear evento"):
+        return ParsedCommand(intent="create_event", payload={"raw": text})
     if clean in {"cancelar", "cancela"}:
         return ParsedCommand(intent="cancel", payload={"raw": text})
     if clean.startswith("resumen"):

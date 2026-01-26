@@ -62,3 +62,10 @@ def get_gmail_service():
     if not creds or not creds.valid:
         return None
     return build("gmail", "v1", credentials=creds)
+
+
+def get_calendar_service():
+    creds = load_credentials()
+    if not creds or not creds.valid:
+        return None
+    return build("calendar", "v3", credentials=creds)

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     google_token_path: str = "backend/.secrets/token.json"
     google_scopes: str = "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar"
     gmail_poll_minutes: int = 5
+    google_calendar_id: str = "primary"
 
     scheduler_timezone: str = "America/Monterrey"
 
