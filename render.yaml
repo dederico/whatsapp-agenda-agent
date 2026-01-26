@@ -47,7 +47,7 @@ services:
     env: node
     plan: starter
     nodeVersion: 20.18.1
-    buildCommand: cd whatsapp-gateway && PUPPETEER_SKIP_DOWNLOAD=1 npm install && PUPPETEER_CACHE_DIR=/opt/render/project/src/whatsapp-gateway/.cache/puppeteer npx @puppeteer/browsers install chrome@131.0.6778.204
+    buildCommand: cd whatsapp-gateway && npm install
     startCommand: node whatsapp-gateway/src/index.js
     rootDir: .
     envVars:
@@ -60,9 +60,9 @@ services:
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
         value: "false"
       - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/project/src/whatsapp-gateway/.cache/puppeteer
+        value: /opt/render/project/src/whatsapp-gateway/node_modules/.cache/puppeteer
       - key: PUPPETEER_SKIP_DOWNLOAD
-        value: "1"
+        value: "0"
       - key: PORT
         value: "3001"
     disk:
