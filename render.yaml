@@ -47,7 +47,7 @@ services:
     env: node
     plan: starter
     nodeVersion: 20.18.1
-    buildCommand: cd whatsapp-gateway && npm install
+    buildCommand: cd whatsapp-gateway && npm install && npx puppeteer browsers install chrome
     startCommand: node whatsapp-gateway/src/index.js
     rootDir: .
     envVars:
