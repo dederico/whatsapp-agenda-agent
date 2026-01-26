@@ -13,18 +13,12 @@ class AIClient:
             "Resume en 1 oración el correo más importante para el dueño del inbox. "
             "No inventes detalles."
         )
-        response = await self.client.responses.create(
+        response = await self.client.chat.completions.create(
             model=self.model,
-            input=[
-                {
-                    "role": "system",
-                    "content": prompt,
-                },
-                {
-                    "role": "user",
-                    "content": f"Asunto: {subject}\n\nContenido: {body}",
-                },
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Asunto: {subject}\n\nContenido: {body}"},
             ],
         )
-        output = response.output_text or ""
+        output = response.choices[0].message.content or ""
         return output.strip() or "Sin resumen."
