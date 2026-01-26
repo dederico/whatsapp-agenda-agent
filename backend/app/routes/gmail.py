@@ -13,7 +13,7 @@ gateway = WhatsAppGateway()
 def _normalize_number(raw: str) -> str:
     # Strip non-digits and normalize MX mobile (52/521) prefixes.
     digits = "".join(ch for ch in (raw or "") if ch.isdigit())
-    if digits.startswith("521") and len(digits) == 13:
+    if digits.startswith("521"):
         return "52" + digits[3:]
     return digits
 

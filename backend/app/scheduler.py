@@ -1,10 +1,10 @@
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from .config import settings
 from .routes.gmail import poll_and_notify
 
-scheduler = BackgroundScheduler(timezone=settings.scheduler_timezone)
+scheduler = AsyncIOScheduler(timezone=settings.scheduler_timezone)
 
 
 def start_scheduler():

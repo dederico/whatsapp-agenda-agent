@@ -14,7 +14,7 @@ gateway = WhatsAppGateway()
 def _normalize_number(raw: str) -> str:
     # Strip non-digits and normalize MX mobile (52/521) prefixes.
     digits = "".join(ch for ch in (raw or "") if ch.isdigit())
-    if digits.startswith("521") and len(digits) == 13:
+    if digits.startswith("521"):
         return "52" + digits[3:]
     return digits
 
@@ -23,7 +23,12 @@ def _normalize_number(raw: str) -> str:
 async def whatsapp_incoming(message: IncomingWhatsAppMessage):
     owner = _normalize_number(settings.owner_whatsapp_number)
     incoming = _normalize_number(message.from_number)
+    state.log_event("whatsapp.incoming", f"from={message.from_number} norm={incoming}")
     if not owner or incoming != owner:
+        state.log_event(
+            "whatsapp.unauthorized",
+            f"from={message.from_number} norm={incoming} owner={owner}",
+        )
         raise HTTPException(status_code=403, detail="unauthorized")
 
     command = parse_command(message.text)
