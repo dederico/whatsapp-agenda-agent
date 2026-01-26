@@ -25,6 +25,7 @@ const initWhatsApp = async () => {
     folderNameToken: tokenFolder,
     headless: true,
     logQR: true,
+    autoClose: 0,
   });
 
   client.onMessage(async (message) => {

@@ -11,7 +11,7 @@ export API_KEY="${API_KEY:-smoke-key}"
 export BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"
 export WPP_TOKEN_FOLDER="${WPP_TOKEN_FOLDER:-/tmp/wpp-smoke}"
 
-node src/index.js &
+node src/index.js >/tmp/gateway-smoke.log 2>&1 &
 pid=$!
 
 for i in {1..20}; do
@@ -26,6 +26,7 @@ for i in {1..20}; do
 done
 
 echo "gateway failed to start"
+tail -n 20 /tmp/gateway-smoke.log || true
 kill "$pid" || true
 wait "$pid" || true
 popd >/dev/null
