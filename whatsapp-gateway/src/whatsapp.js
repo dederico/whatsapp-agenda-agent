@@ -9,6 +9,7 @@ let tokenFolder = null;
 const initWhatsApp = async () => {
   tokenFolder = process.env.WPP_TOKEN_FOLDER || '/var/data/wpp';
 
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
   client = await wppconnect.create({
     session: 'agenda-agent',
     catchQR: (base64Qr) => {
@@ -26,6 +27,7 @@ const initWhatsApp = async () => {
     headless: true,
     logQR: true,
     autoClose: 0,
+    executablePath,
   });
 
   client.onMessage(async (message) => {

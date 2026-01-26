@@ -10,6 +10,7 @@ export PORT="${PORT:-3999}"
 export API_KEY="${API_KEY:-smoke-key}"
 export BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"
 export WPP_TOKEN_FOLDER="${WPP_TOKEN_FOLDER:-/tmp/wpp-smoke}"
+export PUPPETEER_EXECUTABLE_PATH="${PUPPETEER_EXECUTABLE_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 
 node src/index.js >/tmp/gateway-smoke.log 2>&1 &
 pid=$!

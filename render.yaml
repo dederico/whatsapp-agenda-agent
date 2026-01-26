@@ -59,6 +59,8 @@ services:
         value: /var/data/wpp
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
         value: "false"
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/google-chrome
       - key: PORT
         value: "3001"
     disk:
