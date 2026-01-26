@@ -34,6 +34,7 @@ async def poll_and_notify():
         summary=summary,
     )
     state.set_pending(settings.owner_whatsapp_number, pending)
+    state.log_event("email.new", f"From {sender} - {subject}")
 
     await gateway.send_message(
         OutgoingWhatsAppMessage(

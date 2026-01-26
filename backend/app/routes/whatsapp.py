@@ -25,6 +25,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         pending.status = "ignored"
         GmailClient().archive_message(pending.action_id)
         state.clear_pending(message.from_number)
+        state.log_event("email.ignore", f"Archived email {pending.action_id}")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
                 to_number=message.from_number,
@@ -37,6 +38,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         if not pending:
             return {"status": "no_pending"}
         pending.status = "drafting"
+        state.log_event("email.reply.start", f"Drafting reply to {pending.sender}")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
                 to_number=message.from_number,
@@ -51,6 +53,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         pending.status = "approved"
         GmailClient().send_reply(pending.sender, f"Re: {pending.subject}", pending.draft_reply)
         state.clear_pending(message.from_number)
+        state.log_event("email.sent", f"Sent reply to {pending.sender}")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
                 to_number=message.from_number,
@@ -63,6 +66,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         if not pending:
             return {"status": "no_pending"}
         state.clear_pending(message.from_number)
+        state.log_event("email.cancel", "Cancelled pending reply")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
                 to_number=message.from_number,
@@ -73,6 +77,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
     if pending and pending.status == "drafting":
         pending.draft_reply = message.text.strip()
+        state.log_event("email.draft", "Draft prepared")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
                 to_number=message.from_number,

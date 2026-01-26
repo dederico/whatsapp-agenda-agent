@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, Optional
+from collections import deque
 
 
 @dataclass
@@ -17,6 +18,7 @@ class PendingEmailAction:
 class InMemoryState:
     def __init__(self):
         self.pending_by_user: Dict[str, PendingEmailAction] = {}
+        self.events = deque(maxlen=200)
 
     def set_pending(self, user_number: str, action: PendingEmailAction):
         self.pending_by_user[user_number] = action
@@ -27,6 +29,15 @@ class InMemoryState:
     def clear_pending(self, user_number: str):
         if user_number in self.pending_by_user:
             del self.pending_by_user[user_number]
+
+    def log_event(self, kind: str, detail: str):
+        self.events.appendleft(
+            {
+                "ts": datetime.utcnow().isoformat(),
+                "kind": kind,
+                "detail": detail,
+            }
+        )
 
 
 state = InMemoryState()
