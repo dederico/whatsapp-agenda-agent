@@ -84,6 +84,33 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         )
         return {"status": "sent"}
 
+    if command.intent == "confirm":
+        if not pending or not pending.draft_reply:
+            return {"status": "no_draft"}
+        pending.status = "approved"
+        GmailClient().send_reply(pending.sender, f"Re: {pending.subject}", pending.draft_reply)
+        state.clear_pending(user_key)
+        state.log_event("email.sent", f"Sent reply to {pending.sender}")
+        await gateway.send_message(
+            OutgoingWhatsAppMessage(
+                to_number=settings.owner_whatsapp_number,
+                text="Enviado. Si quieres agregar seguimiento, dímelo.",
+            )
+        )
+        return {"status": "sent"}
+
+    if command.intent == "reject":
+        if not pending:
+            return {"status": "no_pending"}
+        pending.status = "drafting"
+        await gateway.send_message(
+            OutgoingWhatsAppMessage(
+                to_number=settings.owner_whatsapp_number,
+                text="Ok, dicta la nueva respuesta y preparo el borrador.",
+            )
+        )
+        return {"status": "drafting"}
+
     if command.intent == "cancel":
         if not pending:
             return {"status": "no_pending"}
@@ -99,6 +126,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
     if pending and pending.status == "drafting":
         pending.draft_reply = message.text.strip()
+        pending.status = "draft_ready"
         state.log_event("email.draft", "Draft prepared")
         await gateway.send_message(
             OutgoingWhatsAppMessage(
