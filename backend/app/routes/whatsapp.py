@@ -11,6 +11,7 @@ from ..services.calendar import CalendarClient
 from ..services.ai import AIClient
 from ..state import state
 from ..whatsapp_commands import parse_command
+from ..schemas import CalendarEventDraft
 
 router = APIRouter()
 gateway = WhatsAppGateway()
@@ -161,6 +162,18 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
             )
         )
         return {"status": "events_sent"}
+
+    if command.intent == "help_email":
+        await gateway.send_message(
+            OutgoingWhatsAppMessage(
+                to_number=settings.owner_whatsapp_number,
+                text=(
+                    "Para contestar un correo, espera a que llegue la notificación y responde: "
+                    "'contestar'. Luego dicta tu respuesta y confirma con 'enviar'."
+                ),
+            )
+        )
+        return {"status": "help_email"}
 
     if command.intent == "create_event":
         raw = command.payload.get("raw", "")

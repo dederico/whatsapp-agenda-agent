@@ -25,6 +25,8 @@ async def poll_and_notify():
         return {"status": "no_unread"}
 
     msg_id = messages[0]["id"]
+    if state.has_seen_email(msg_id):
+        return {"status": "already_seen", "message_id": msg_id}
     full = gmail.get_message(msg_id)
     headers = extract_headers(full.get("payload", {}))
     sender = headers.get("from", "desconocido")
@@ -55,6 +57,7 @@ async def poll_and_notify():
     )
     # Avoid repeated notifications by marking as read/archived after notify.
     gmail.archive_message(msg_id)
+    state.mark_email_seen(msg_id)
     return {"status": "notified", "message_id": msg_id}
 
 

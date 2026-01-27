@@ -21,6 +21,7 @@ class InMemoryState:
         self.events = deque(maxlen=200)
         self.reminders_sent: set[str] = set()
         self.last_reco_date: str | None = None
+        self.seen_email_ids: set[str] = set()
 
     def set_pending(self, user_number: str, action: PendingEmailAction):
         self.pending_by_user[user_number] = action
@@ -45,6 +46,14 @@ class InMemoryState:
         if len(self.reminders_sent) > 2000:
             self.reminders_sent.clear()
         self.reminders_sent.add(key)
+
+    def mark_email_seen(self, message_id: str):
+        if len(self.seen_email_ids) > 5000:
+            self.seen_email_ids.clear()
+        self.seen_email_ids.add(message_id)
+
+    def has_seen_email(self, message_id: str) -> bool:
+        return message_id in self.seen_email_ids
 
 
 state = InMemoryState()
