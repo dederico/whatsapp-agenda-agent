@@ -179,6 +179,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
             try:
                 draft = await ai.parse_event(raw, settings.scheduler_timezone)
             except ValueError:
+                state.log_event("calendar.parse_failed", raw)
                 await gateway.send_message(
                     OutgoingWhatsAppMessage(
                         to_number=settings.owner_whatsapp_number,
@@ -190,25 +191,35 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                     )
                 )
                 return {"status": "parse_failed"}
-        payload = {
-            "summary": draft.title,
-            "location": draft.location,
-            "description": draft.notes,
-            "start": {"dateTime": draft.start},
-            "end": {"dateTime": draft.end or draft.start},
-        }
-        if draft.attendees:
-            payload["attendees"] = [{"email": a} for a in draft.attendees]
-        cal = CalendarClient()
-        created = await cal.create_event(payload)
-        state.log_event("calendar.create", f"{created.get('summary')} @ {created.get('start')}")
-        await gateway.send_message(
-            OutgoingWhatsAppMessage(
-                to_number=settings.owner_whatsapp_number,
-                text=f"Listo, agendé: {created.get('summary')}.",
+        try:
+            payload = {
+                "summary": draft.title,
+                "location": draft.location,
+                "description": draft.notes,
+                "start": {"dateTime": draft.start},
+                "end": {"dateTime": draft.end or draft.start},
+            }
+            if draft.attendees:
+                payload["attendees"] = [{"email": a} for a in draft.attendees]
+            cal = CalendarClient()
+            created = await cal.create_event(payload)
+            state.log_event("calendar.create", f"{created.get('summary')} @ {created.get('start')}")
+            await gateway.send_message(
+                OutgoingWhatsAppMessage(
+                    to_number=settings.owner_whatsapp_number,
+                    text=f"Listo, agendé: {created.get('summary')}.",
+                )
             )
-        )
-        return {"status": "created"}
+            return {"status": "created"}
+        except Exception as exc:
+            state.log_event("calendar.create_failed", str(exc))
+            await gateway.send_message(
+                OutgoingWhatsAppMessage(
+                    to_number=settings.owner_whatsapp_number,
+                    text="No pude crear el evento. ¿Me das la hora y el nombre exactos?",
+                )
+            )
+            return {"status": "create_failed"}
 
     if pending and pending.status == "drafting":
         pending.draft_reply = message.text.strip()

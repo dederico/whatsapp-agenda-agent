@@ -53,6 +53,8 @@ async def poll_and_notify():
             ),
         )
     )
+    # Avoid repeated notifications by marking as read/archived after notify.
+    gmail.archive_message(msg_id)
     return {"status": "notified", "message_id": msg_id}
 
 
