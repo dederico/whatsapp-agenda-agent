@@ -44,8 +44,13 @@ server.route({
     }
 
     const { to_number, text } = request.payload;
-    await sendMessage(to_number, text);
-    return { status: 'sent' };
+    try {
+      await sendMessage(to_number, text);
+      return { status: 'sent' };
+    } catch (err) {
+      console.error('[agenda-agent] send failed', err);
+      return { error: 'send_failed' };
+    }
   },
 });
 
