@@ -6,10 +6,41 @@ let client = null;
 let lastQr = null;
 let tokenFolder = null;
 
+const parseBlocklist = () => {
+  const raw = process.env.WHATSAPP_BLOCKLIST || '';
+  const items = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const list = new Set();
+  for (const item of items) {
+    if (item.includes('@')) {
+      list.add(item);
+      continue;
+    }
+    const digits = item.replace(/\D/g, '');
+    if (digits) {
+      list.add(digits);
+    }
+  }
+  return list;
+};
+
+const isBlocked = (blocklist, message, from) => {
+  const rawFrom = message?.from;
+  if (rawFrom && blocklist.has(rawFrom)) {
+    return true;
+  }
+  if (from && blocklist.has(from)) {
+    return true;
+  }
+  return false;
+};
+
 const getFromNumber = (message) => {
   const from = message?.from;
   if (from && typeof from === 'string') {
-    if (from.includes('status@broadcast') || from.endsWith('@g.us')) {
+    if (from.includes('status@broadcast') || from.endsWith('@newsletter')) {
       return undefined;
     }
     if (from.endsWith('@c.us')) {
@@ -17,6 +48,9 @@ const getFromNumber = (message) => {
     }
     if (from.endsWith('@lid')) {
       return from.split('@')[0];
+    }
+    if (from.endsWith('@g.us')) {
+      return from;
     }
   }
   const senderUser = message?.sender?.id?.user;
@@ -76,13 +110,14 @@ const initWhatsApp = async () => {
       console.error('[agenda-agent] MSG ignored (empty body or fromMe)');
       return;
     }
-    if (message.isGroupMsg) {
-      console.error('[agenda-agent] MSG ignored (group)');
-      return;
-    }
     const from = getFromNumber(message);
     const text = message.body;
     if (!from || !text) {
+      return;
+    }
+    const blocklist = parseBlocklist();
+    if (isBlocked(blocklist, message, from)) {
+      console.error(`[agenda-agent] MSG blocked from=${from}`);
       return;
     }
     console.error('[agenda-agent] INBOUND_HOOK_TEST');
