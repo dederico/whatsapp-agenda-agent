@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timedelta
+import re
 
 from ..config import settings
 from ..schemas import IncomingWhatsAppMessage, OutgoingWhatsAppMessage
@@ -163,19 +164,32 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
     if command.intent == "create_event":
         raw = command.payload.get("raw", "")
         ai = AIClient(settings.openai_api_key)
-        try:
-            draft = await ai.parse_event(raw, settings.scheduler_timezone)
-        except ValueError:
-            await gateway.send_message(
-                OutgoingWhatsAppMessage(
-                    to_number=settings.owner_whatsapp_number,
-                    text=(
-                        "No pude entender el evento. Intenta: "
-                        "'crear evento mañana 6am llamado LEVANTARSE en casa'."
-                    ),
+        draft = None
+        # Fast-path: if ISO datetime is present, parse locally.
+        match = re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", raw)
+        if match:
+            start_iso = match.group(0)
+            title = raw
+            title = re.sub(r"(?i)^crear evento\s*", "", title)
+            title = title.replace(start_iso, "").strip()
+            if not title:
+                title = "Evento"
+            draft = CalendarEventDraft(title=title, start=start_iso)
+        if not draft:
+            try:
+                draft = await ai.parse_event(raw, settings.scheduler_timezone)
+            except ValueError:
+                await gateway.send_message(
+                    OutgoingWhatsAppMessage(
+                        to_number=settings.owner_whatsapp_number,
+                        text=(
+                            "No pude entender el evento. Ejemplos:\n"
+                            "1) crear evento mañana 6am llamado LEVANTARSE en casa\n"
+                            "2) crear evento LEVANTARSE 2026-01-27T06:00:00-06:00"
+                        ),
+                    )
                 )
-            )
-            return {"status": "parse_failed"}
+                return {"status": "parse_failed"}
         payload = {
             "summary": draft.title,
             "location": draft.location,

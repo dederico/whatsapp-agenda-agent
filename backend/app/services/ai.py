@@ -45,6 +45,7 @@ class AIClient:
                     "content": f"Zona horaria: {timezone}\nTexto: {text}",
                 },
             ],
+            response_format={"type": "json_object"},
         )
         raw = response.choices[0].message.content or "{}"
         try:
