@@ -136,7 +136,8 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
     if command.intent == "agenda":
         cal = CalendarClient()
-        now = datetime.utcnow()
+        tz = ZoneInfo(settings.scheduler_timezone)
+        now = datetime.now(tz)
         end = now + timedelta(days=1)
         events = await cal.list_events(now, end, max_results=5)
         if not events:
