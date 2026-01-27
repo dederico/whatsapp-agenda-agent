@@ -138,6 +138,12 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
     if command.intent == "cancel":
         if not pending:
+            await gateway.send_message(
+                OutgoingWhatsAppMessage(
+                    to_number=settings.owner_whatsapp_number,
+                    text="No hay ninguna acción pendiente para cancelar.",
+                )
+            )
             return {"status": "no_pending"}
         state.clear_pending(user_key)
         state.log_event("email.cancel", "Cancelled pending reply")
