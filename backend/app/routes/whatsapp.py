@@ -10,7 +10,7 @@ from ..services.gmail import GmailClient
 from ..services.calendar import CalendarClient
 from ..services.ai import AIClient
 from ..state import state
-from ..whatsapp_commands import parse_command
+from ..whatsapp_commands import parse_command, ParsedCommand
 from ..schemas import CalendarEventDraft
 
 router = APIRouter()
@@ -50,6 +50,16 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         "whatsapp.command",
         f"intent={command.intent} pending={pending.status if pending else 'none'} text={message.text}",
     )
+
+    # If no explicit command, ask the model to route intent.
+    if command.intent == "freeform":
+        ai = AIClient(settings.openai_api_key)
+        routed = await ai.classify_intent(
+            message.text,
+            has_pending=bool(pending),
+            pending_summary=pending.summary if pending else None,
+        )
+        command = ParsedCommand(intent=routed.get("intent", "chat"), payload={"raw": message.text})
 
     if command.intent == "ignore":
         if not pending:
@@ -163,6 +173,17 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
             )
         )
         return {"status": "events_sent"}
+
+    if command.intent == "chat":
+        ai = AIClient(settings.openai_api_key)
+        reply = await ai.chat_response(message.text)
+        await gateway.send_message(
+            OutgoingWhatsAppMessage(
+                to_number=settings.owner_whatsapp_number,
+                text=reply,
+            )
+        )
+        return {"status": "chat"}
 
     if command.intent == "help_email":
         await gateway.send_message(
