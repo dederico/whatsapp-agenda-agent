@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timedelta
 import re
+from zoneinfo import ZoneInfo
 
 from ..config import settings
 from ..schemas import IncomingWhatsAppMessage, OutgoingWhatsAppMessage
@@ -175,6 +176,31 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
             if not title:
                 title = "Evento"
             draft = CalendarEventDraft(title=title, start=start_iso)
+        # Fast-path: natural Spanish "hoy/mañana" with time.
+        if not draft and re.search(r"\b(mañana|manana|hoy)\b", raw, re.IGNORECASE):
+            tz = ZoneInfo(settings.scheduler_timezone)
+            now = datetime.now(tz)
+            day_offset = 1 if re.search(r"\b(mañana|manana)\b", raw, re.IGNORECASE) else 0
+            time_match = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", raw, re.IGNORECASE)
+            if time_match:
+                hour = int(time_match.group(1))
+                minute = int(time_match.group(2) or "0")
+                meridian = (time_match.group(3) or "").lower()
+                if meridian == "pm" and hour < 12:
+                    hour += 12
+                if meridian == "am" and hour == 12:
+                    hour = 0
+                start_dt = (now + timedelta(days=day_offset)).replace(
+                    hour=hour, minute=minute, second=0, microsecond=0
+                )
+                title = raw
+                title = re.sub(r"(?i)^crear evento\s*", "", title)
+                title = re.sub(r"(?i)mañana|manana|hoy", "", title)
+                title = re.sub(r"(?i)llamado|llamada", "", title)
+                title = re.sub(r"(?i)\b(am|pm)\b", "", title)
+                title = re.sub(r"\d{1,2}(?::\d{2})?", "", title).strip()
+                title = title or "Evento"
+                draft = CalendarEventDraft(title=title, start=start_dt.isoformat())
         if not draft:
             try:
                 draft = await ai.parse_event(raw, settings.scheduler_timezone)
@@ -207,7 +233,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
             await gateway.send_message(
                 OutgoingWhatsAppMessage(
                     to_number=settings.owner_whatsapp_number,
-                    text=f"Listo, agendé: {created.get('summary')}.",
+                    text=f"Listo, agendé: {created.get('summary')} @ {created.get('start', {}).get('dateTime')}.",
                 )
             )
             return {"status": "created"}

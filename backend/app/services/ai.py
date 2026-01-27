@@ -36,13 +36,17 @@ class AIClient:
             "attendees es una lista de emails si aparecen. "
             "No inventes datos."
         )
+        now_iso = datetime.now(ZoneInfo(timezone)).isoformat()
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": prompt},
+                {
+                    "role": "system",
+                    "content": f"{prompt}\nFecha/hora actual: {now_iso}\nZona horaria: {timezone}",
+                },
                 {
                     "role": "user",
-                    "content": f"Zona horaria: {timezone}\nTexto: {text}",
+                    "content": f"Texto: {text}",
                 },
             ],
             response_format={"type": "json_object"},
