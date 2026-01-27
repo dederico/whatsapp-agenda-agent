@@ -49,6 +49,14 @@ class CalendarClient:
             .execute()
         )
 
+    async def delete_event(self, event_id: str):
+        self._ensure_service()
+        return (
+            self.service.events()
+            .delete(calendarId=settings.google_calendar_id, eventId=event_id)
+            .execute()
+        )
+
     @staticmethod
     def event_start_end(event: dict) -> tuple[datetime | None, datetime | None]:
         start = event.get("start", {})

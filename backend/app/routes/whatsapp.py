@@ -297,6 +297,61 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
             )
             return {"status": "create_failed"}
 
+    if command.intent == "cancel_event":
+        raw = command.payload.get("raw", "")
+        query = re.sub(r"(?i)^cancelar evento\s*|^cancela evento\s*", "", raw).strip()
+        if not query:
+            await gateway.send_message(
+                OutgoingWhatsAppMessage(
+                    to_number=settings.owner_whatsapp_number,
+                    text="Dime el nombre del evento a cancelar. Ejemplo: cancelar evento LEVANTARSE.",
+                )
+            )
+            return {"status": "cancel_missing_query"}
+        cal = CalendarClient()
+        tz = ZoneInfo(settings.scheduler_timezone)
+        now = datetime.now(tz)
+        end = now + timedelta(days=30)
+        events = await cal.list_events(now, end, max_results=50)
+        matches = []
+        for ev in events:
+            summary = (ev.get("summary") or "").lower()
+            if query.lower() in summary:
+                matches.append(ev)
+        if not matches:
+            await gateway.send_message(
+                OutgoingWhatsAppMessage(
+                    to_number=settings.owner_whatsapp_number,
+                    text=f"No encontré eventos que coincidan con '{query}' en los próximos 30 días.",
+                )
+            )
+            return {"status": "cancel_not_found"}
+        if len(matches) > 1:
+            lines = []
+            for ev in matches[:5]:
+                start = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date")
+                lines.append(f"- {ev.get('summary')} · {start}")
+            await gateway.send_message(
+                OutgoingWhatsAppMessage(
+                    to_number=settings.owner_whatsapp_number,
+                    text=(
+                        "Hay varios eventos con ese nombre. Sé más específico:\n"
+                        + "\n".join(lines)
+                    ),
+                )
+            )
+            return {"status": "cancel_ambiguous"}
+        target = matches[0]
+        await cal.delete_event(target.get("id"))
+        state.log_event("calendar.cancel", f"{target.get('summary')} @ {target.get('start')}")
+        await gateway.send_message(
+            OutgoingWhatsAppMessage(
+                to_number=settings.owner_whatsapp_number,
+                text=f"Cancelé el evento: {target.get('summary')}.",
+            )
+        )
+        return {"status": "cancelled"}
+
     if pending and pending.status == "drafting":
         pending.draft_reply = message.text.strip()
         pending.status = "draft_ready"

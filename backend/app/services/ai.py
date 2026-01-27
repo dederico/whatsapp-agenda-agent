@@ -30,10 +30,11 @@ class AIClient:
     async def classify_intent(self, text: str, has_pending: bool, pending_summary: str | None) -> dict:
         prompt = (
             "Eres un router de intents para WhatsApp. Elige SOLO un intent: "
-            "agenda, create_event, reply, send, ignore, cancel, chat. "
+            "agenda, create_event, cancel_event, reply, send, ignore, cancel, chat. "
             "Devuelve JSON con llaves: intent, rationale (breve). "
             "Si el usuario pide agenda, usa agenda. "
             "Si quiere crear una cita, usa create_event. "
+            "Si quiere cancelar una cita, usa cancel_event. "
             "Si quiere contestar correo, usa reply. "
             "Si confirma enviar, usa send. "
             "Si quiere ignorar/eliminar, usa ignore. "
@@ -57,7 +58,7 @@ class AIClient:
             data = json.loads(raw)
         except json.JSONDecodeError:
             data = {"intent": "chat", "rationale": "parse_error"}
-        if data.get("intent") not in {"agenda", "create_event", "reply", "send", "ignore", "cancel", "chat"}:
+        if data.get("intent") not in {"agenda", "create_event", "cancel_event", "reply", "send", "ignore", "cancel", "chat"}:
             data["intent"] = "chat"
         return data
 
