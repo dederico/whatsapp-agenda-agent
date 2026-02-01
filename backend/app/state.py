@@ -15,9 +15,23 @@ class PendingEmailAction:
     draft_reply: Optional[str] = None
 
 
+@dataclass
+class AppointmentConversation:
+    """Trackea el estado de una conversación de agendamiento de cita."""
+    patient_number: str
+    state: str = "initial"  # initial | diagnosing | offering_appointment | choosing_office | scheduling | confirming
+    symptoms: Optional[str] = None
+    proposed_times: list = field(default_factory=list)  # Lista de horarios propuestos
+    selected_time: Optional[str] = None
+    selected_office: Optional[str] = None  # muguerza | zambrano | imss
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    last_updated: datetime = field(default_factory=datetime.utcnow)
+
+
 class InMemoryState:
     def __init__(self):
         self.pending_by_user: Dict[str, PendingEmailAction] = {}
+        self.appointment_conversations: Dict[str, AppointmentConversation] = {}
         self.events = deque(maxlen=200)
         self.reminders_sent: set[str] = set()
         self.last_reco_date: str | None = None
@@ -54,6 +68,18 @@ class InMemoryState:
 
     def has_seen_email(self, message_id: str) -> bool:
         return message_id in self.seen_email_ids
+
+    # Métodos para gestionar conversaciones de citas
+    def get_appointment_conversation(self, patient_number: str) -> Optional[AppointmentConversation]:
+        return self.appointment_conversations.get(patient_number)
+
+    def set_appointment_conversation(self, patient_number: str, conversation: AppointmentConversation):
+        conversation.last_updated = datetime.utcnow()
+        self.appointment_conversations[patient_number] = conversation
+
+    def clear_appointment_conversation(self, patient_number: str):
+        if patient_number in self.appointment_conversations:
+            del self.appointment_conversations[patient_number]
 
 
 state = InMemoryState()

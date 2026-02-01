@@ -2,6 +2,7 @@ from openai import AsyncOpenAI
 import json
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from typing import List
 
 from ..config import settings
 from ..schemas import CalendarEventDraft
@@ -65,13 +66,18 @@ class AIClient:
     async def analyze_health_query(self, text: str) -> dict:
         """Analiza consulta de salud y determina urgencia y necesidad de cita."""
         prompt = (
-            "Eres un consejero de salud. Analiza este mensaje y devuelve JSON con: "
+            "Eres el Dr. Eduardo González Dávila, neo-neonatólogo de Monterrey con más de 10 años de experiencia. "
+            "Analiza este mensaje y devuelve JSON con: "
             "is_emergency (bool): true si es emergencia médica que requiere atención inmediata, "
-            "needs_appointment (bool): true si la persona debería agendar cita con doctor, "
+            "needs_appointment (bool): true si deberías sugerir agendar cita (SOLO sugiere, NO la crees), "
+            "needs_more_info (bool): true si necesitas hacer preguntas para entender mejor el caso, "
             "urgency (str): 'high', 'medium', 'low', "
-            "suggested_response (str): respuesta empática y profesional para el paciente. "
-            "Si es emergencia, recomienda FIRMEMENTE llamar al doctor o ir a emergencias. "
-            "Si necesita cita, sugiérelo amablemente."
+            "suggested_response (str): respuesta cálida, empática y profesional. "
+            "Incluye tu presentación si es el primer mensaje. "
+            "Haz preguntas diagnósticas cuando sea necesario. "
+            "Da tips y recomendaciones básicas cuando sea apropiado. "
+            "Conduce sutilmente hacia agendar cita, pero de manera natural y no agresiva. "
+            "Si es emergencia, recomienda FIRMEMENTE acudir a emergencias de inmediato."
         )
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -94,15 +100,22 @@ class AIClient:
         return data
 
     async def chat_response(self, text: str) -> str:
-        """Respuesta simple como consejero de salud."""
+        """Respuesta como Dr. Eduardo González Dávila."""
         prompt = (
-            "Eres un consejero de salud profesional y empático. "
-            "Tu objetivo es ayudar a las personas con consultas de salud, "
-            "brindar consejos básicos y detectar emergencias. "
-            "Sé cálido, profesional y breve en tus respuestas. "
-            "Si detectas una posible emergencia médica, recomienda firmemente "
-            "que llamen al doctor o acudan a emergencias de inmediato. "
-            "No des diagnósticos definitivos, solo orientación general."
+            "Eres el Dr. Eduardo González Dávila, neo-neonatólogo de Monterrey, Nuevo León. "
+            "Tienes más de 10 años de experiencia, más de 20 certificaciones, y te mantienes en constante actualización profesional. "
+            "Hiciste tu servicio social en Reynosa, Tamaulipas. Eres padre de dos niñas (Sofia y Paulina) y esposo de Tere Garza. "
+            "\n\n"
+            "INSTRUCCIONES:\n"
+            "- Si es el PRIMER mensaje, preséntate: 'Hola! Soy el Dr. Eduardo González Dávila, será un gusto atenderte.'\n"
+            "- Haz preguntas para entender mejor (¿hace cuánto?, ¿qué tan intenso?, ¿síntomas adicionales?)\n"
+            "- Da tips y recomendaciones básicas (remedios caseros, medicamentos de venta libre, cuidados)\n"
+            "- Conduce SUTILMENTE a que agenden cita CONTIGO en tu consultorio\n"
+            "- NUNCA digas 'consulta a un médico' - TÚ ERES EL MÉDICO\n"
+            "- Di cosas como: '¿Te gustaría que te revise en consultorio?', 'Podemos agendar una cita para revisarte'\n"
+            "- Si es emergencia GRAVE (peligro de vida), recomienda ir a urgencias PERO ofrece seguimiento contigo después\n"
+            "- NO des diagnósticos definitivos, solo orientación\n"
+            "- Sé breve (máximo 3-4 párrafos cortos), cálido y profesional"
         )
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -156,3 +169,62 @@ class AIClient:
             except Exception:
                 pass
         return draft
+
+    async def suggest_available_slots(
+        self,
+        existing_events: List[dict],
+        timezone: str,
+        days_ahead: int = 7
+    ) -> List[dict]:
+        """
+        Analiza eventos existentes y sugiere horarios disponibles.
+        Retorna lista de slots disponibles con formato amigable.
+        """
+        tz = ZoneInfo(timezone)
+        now = datetime.now(tz)
+
+        # Horario de consultorio: Lunes a Domingo, 8am-6pm
+        # Slots de 1 hora cada uno
+        available_slots = []
+
+        for day_offset in range(days_ahead):
+            day = now + timedelta(days=day_offset + 1)  # Empezar desde mañana
+
+            # Horario: Todos los días 8am-6pm
+            start_hour, end_hour = 8, 18  # 8am-6pm
+
+            # Revisar cada hora
+            for hour in range(start_hour, end_hour):
+                slot_start = day.replace(hour=hour, minute=0, second=0, microsecond=0)
+                slot_end = slot_start + timedelta(hours=1)
+
+                # Verificar si hay conflicto con eventos existentes
+                has_conflict = False
+                for event in existing_events:
+                    event_start_str = event.get("start", {}).get("dateTime")
+                    event_end_str = event.get("end", {}).get("dateTime")
+
+                    if event_start_str and event_end_str:
+                        try:
+                            event_start = datetime.fromisoformat(event_start_str.replace("Z", "+00:00"))
+                            event_end = datetime.fromisoformat(event_end_str.replace("Z", "+00:00"))
+
+                            # Hay conflicto si los slots se solapan
+                            if slot_start < event_end and slot_end > event_start:
+                                has_conflict = True
+                                break
+                        except Exception:
+                            continue
+
+                if not has_conflict:
+                    # Formatear para el usuario
+                    day_name = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][day.weekday()]
+                    available_slots.append({
+                        "datetime": slot_start.isoformat(),
+                        "display": f"{day_name} {day.day} de {slot_start.strftime('%B')} a las {hour}:00",
+                        "day": day_name,
+                        "date": day.strftime("%Y-%m-%d"),
+                        "time": f"{hour}:00"
+                    })
+
+        return available_slots[:10]  # Retornar máximo 10 slots
