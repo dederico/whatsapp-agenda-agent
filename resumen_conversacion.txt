@@ -1,17 +1,39 @@
-RESUMEN DE CONVERSACIÓN - Configuración Agente de Agenda
-===========================================================
+RESUMEN DE CONVERSACIÓN - Bot de Consejero de Salud
+=====================================================
 Fecha: 2026-02-01
 
 CONTEXTO
 --------
-El usuario solicitó configurar el agente de agenda inteligente con WhatsApp,
-preguntando qué cuentas necesitaba crear para Google Calendar, WhatsApp,
-y el modelo LLM.
+El usuario solicitó configurar un BOT DE SALUD que:
+- Escucha TODOS los mensajes de WhatsApp automáticamente
+- Responde como consejero de salud profesional
+- Detecta emergencias e invita a llamar al doctor
+- Crea citas en Google Calendar automáticamente
 
 ACCIONES REALIZADAS
 -------------------
 
-1. LOGIN EN RENDER CON NUEVA CUENTA
+1. MODIFICACIONES AL CÓDIGO
+
+   a) backend/app/services/ai.py:
+      - Agregada función analyze_health_query() que detecta:
+        * is_emergency: si es emergencia médica
+        * needs_appointment: si necesita cita con doctor
+        * urgency: nivel de urgencia (high/medium/low)
+        * suggested_response: respuesta empática sugerida
+      - Modificado chat_response() para actuar como consejero de salud profesional
+
+   b) backend/app/routes/whatsapp.py:
+      - REMOVIDO filtro de owner (ahora acepta CUALQUIER número)
+      - REMOVIDA toda la lógica de comandos y correos electrónicos
+      - NUEVA lógica simple:
+        1. Analizar mensaje con analyze_health_query()
+        2. Si es emergencia → agregar mensaje urgente de llamar al doctor
+        3. Si necesita cita → crear evento automáticamente en Google Calendar (mañana 10am)
+        4. Responder automáticamente al usuario
+      - Bot completamente automático, sin intervención humana
+
+2. LOGIN EN RENDER CON NUEVA CUENTA
    - Se configuró un segundo perfil de Render CLI para mantener ambas cuentas
    - Cuenta anterior: goldencoyotesnet@gmail.com (Golder)
    - Cuenta nueva: developer@beholder.com.mx (Orakron)
