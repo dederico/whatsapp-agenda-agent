@@ -1,0 +1,115 @@
+RESUMEN DE CONVERSACIÓN - Configuración Agente de Agenda
+===========================================================
+Fecha: 2026-02-01
+
+CONTEXTO
+--------
+El usuario solicitó configurar el agente de agenda inteligente con WhatsApp,
+preguntando qué cuentas necesitaba crear para Google Calendar, WhatsApp,
+y el modelo LLM.
+
+ACCIONES REALIZADAS
+-------------------
+
+1. LOGIN EN RENDER CON NUEVA CUENTA
+   - Se configuró un segundo perfil de Render CLI para mantener ambas cuentas
+   - Cuenta anterior: goldencoyotesnet@gmail.com (Golder)
+   - Cuenta nueva: developer@beholder.com.mx (Orakron)
+   - Se crearon 2 archivos de configuración:
+     * ~/.render/cli.yaml (cuenta Golder)
+     * ~/.render/cli-orakron.yaml (cuenta Orakron)
+
+2. VERIFICACIÓN DE SERVICIOS EXISTENTES
+   Los servicios ya estaban creados en la cuenta Orakron:
+
+   a) Backend FastAPI:
+      - Nombre: Agente-Agenda-Calendario-Api
+      - Plan: starter ($7/mes) ✅
+      - URL: https://agente-agenda-calendario-api.onrender.com
+      - ID: srv-d5r9prm3jp1c73fio0g0
+
+   b) WhatsApp Gateway (Node.js):
+      - Nombre: Agente-Agenda-Calendario
+      - Plan: standard ($25/mes) ✅
+      - URL: https://agente-agenda-calendario.onrender.com
+      - ID: srv-d5r9prm3jp1c73fio0b0
+
+   c) PostgreSQL Database:
+      - Nombre: agente-personal-agenda-calendario
+      - Plan: free
+      - ID: dpg-d5r99kv5r7bs7392jovg-a
+
+3. DOCUMENTACIÓN CREADA
+   - CONFIGURACION.txt: Guía completa con:
+     * Información de servicios y cuentas
+     * Variables de entorno pendientes
+     * Pasos siguientes para configurar Google y OpenAI
+     * Comandos útiles
+     * Enlaces importantes
+
+   - render-orakron.sh: Script de ayuda para usar Render CLI con la cuenta Orakron
+
+CUENTAS QUE NECESITA CREAR EL USUARIO
+--------------------------------------
+
+1. ✅ Render (ya configurado)
+   - Cuenta: developer@beholder.com.mx
+   - Servicios ya desplegados
+
+2. ⚠️  Google Cloud Console (PENDIENTE)
+   - Crear proyecto
+   - Habilitar Gmail API y Calendar API
+   - Crear credenciales OAuth 2.0
+   - Configurar redirect URI: https://agente-agenda-calendario-api.onrender.com/oauth/callback
+   - Obtener: GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET
+
+3. ⚠️  OpenAI (PENDIENTE)
+   - Crear API Key en https://platform.openai.com/api-keys
+   - Obtener: OPENAI_API_KEY
+
+4. ✅ WhatsApp (NO REQUIERE CUENTA NUEVA)
+   - Usa el número personal del usuario
+   - Solo escanear QR cuando esté configurado
+
+5. ✅ PostgreSQL (ya creado en Render)
+   - Base de datos ya desplegada (plan free)
+
+VARIABLES DE ENTORNO PENDIENTES DE CONFIGURAR
+----------------------------------------------
+
+Backend:
+- API_KEY_INTERNAL (generar con uuidgen)
+- DATABASE_URL (obtener de Render PostgreSQL)
+- WHATSAPP_GATEWAY_URL=https://agente-agenda-calendario.onrender.com
+- WHATSAPP_GATEWAY_API_KEY (generar con uuidgen)
+- OWNER_WHATSAPP_NUMBER=+521XXXXXXXXXX
+- OPENAI_API_KEY (de OpenAI)
+- GOOGLE_CLIENT_ID (de Google Cloud)
+- GOOGLE_CLIENT_SECRET (de Google Cloud)
+- GOOGLE_REDIRECT_URI=https://agente-agenda-calendario-api.onrender.com/oauth/callback
+
+WhatsApp Gateway:
+- API_KEY (mismo que WHATSAPP_GATEWAY_API_KEY del backend)
+- BACKEND_URL=https://agente-agenda-calendario-api.onrender.com
+
+PRÓXIMOS PASOS
+--------------
+1. Crear proyecto en Google Cloud Console y obtener credenciales OAuth
+2. Crear API Key de OpenAI
+3. Configurar todas las variables de entorno en Render Dashboard
+4. Autorizar OAuth de Google
+5. Escanear QR de WhatsApp
+6. Probar el sistema
+
+ARCHIVOS DE AYUDA CREADOS
+--------------------------
+- CONFIGURACION.txt: Documentación completa de configuración
+- render-orakron.sh: Script para usar Render CLI con cuenta Orakron
+- resumen_conversacion.txt: Este archivo
+
+USO DEL SCRIPT DE AYUDA
+------------------------
+# Desde la raíz del proyecto:
+./render-orakron.sh services list -o yaml
+./render-orakron.sh logs srv-d5r9prm3jp1c73fio0g0
+./render-orakron.sh whoami

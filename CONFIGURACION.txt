@@ -1,0 +1,137 @@
+CONFIGURACIÓN DEL AGENTE DE AGENDA
+=======================================
+
+CUENTA RENDER CONFIGURADA
+--------------------------
+Email: developer@beholder.com.mx
+Workspace: Human Gonzalez's Workspace
+Workspace ID: tea-csppvel6l47c738h2bu0
+
+PARA USAR RENDER CLI CON ESTA CUENTA:
+--------------------------------------
+export RENDER_CLI_CONFIG_PATH=~/.render/cli-orakron.yaml
+
+SERVICIOS DESPLEGADOS
+----------------------
+
+1. Backend (FastAPI)
+   - Nombre: Agente-Agenda-Calendario-Api
+   - Plan: starter ($7/mes)
+   - URL: https://agente-agenda-calendario-api.onrender.com
+   - ID: srv-d5r9prm3jp1c73fio0g0
+   - Repositorio: https://github.com/dederico/whatsapp-agenda-agent
+   - Branch: main
+
+2. WhatsApp Gateway (Node.js)
+   - Nombre: Agente-Agenda-Calendario
+   - Plan: standard ($25/mes)
+   - URL: https://agente-agenda-calendario.onrender.com
+   - ID: srv-d5r9prm3jp1c73fio0b0
+   - Repositorio: https://github.com/dederico/whatsapp-agenda-agent
+   - Branch: main
+
+3. Base de datos (PostgreSQL)
+   - Nombre: agente-personal-agenda-calendario
+   - Plan: free
+   - ID: dpg-d5r99kv5r7bs7392jovg-a
+   - Database: agente_personal_agenda_calendario
+   - User: agente_personal_agenda_calendario_user
+
+VARIABLES DE ENTORNO A CONFIGURAR
+-----------------------------------
+
+Backend (Agente-Agenda-Calendario-Api):
+✅ PYTHON_VERSION=3.11.9
+✅ ENV=prod
+✅ OPENAI_MODEL=gpt-4o-mini
+✅ GOOGLE_TOKEN_PATH=/var/data/token.json
+✅ GOOGLE_SCOPES=https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar
+✅ GMAIL_POLL_MINUTES=5
+
+⚠️  PENDIENTES (sync: false - configurar manualmente):
+- API_KEY_INTERNAL=tu_api_key_super_secreta_123
+- DATABASE_URL=postgresql://... (obtener de la DB en Render)
+- WHATSAPP_GATEWAY_URL=https://agente-agenda-calendario.onrender.com
+- WHATSAPP_GATEWAY_API_KEY=otra_api_key_secreta_456
+- OWNER_WHATSAPP_NUMBER=+5211234567890
+- OPENAI_API_KEY=sk-...
+- GOOGLE_CLIENT_ID=123456-abc.apps.googleusercontent.com
+- GOOGLE_CLIENT_SECRET=GOCSPX-...
+- GOOGLE_REDIRECT_URI=https://agente-agenda-calendario-api.onrender.com/oauth/callback
+
+WhatsApp Gateway (Agente-Agenda-Calendario):
+✅ WPP_TOKEN_FOLDER=/var/data/wpp
+✅ PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
+✅ PUPPETEER_CACHE_DIR=/opt/render/project/src/whatsapp-gateway/node_modules/.cache/puppeteer
+✅ PUPPETEER_SKIP_DOWNLOAD=0
+✅ PORT=3001
+
+⚠️  PENDIENTES (sync: false - configurar manualmente):
+- API_KEY=otra_api_key_secreta_456 (la misma que WHATSAPP_GATEWAY_API_KEY del backend)
+- BACKEND_URL=https://agente-agenda-calendario-api.onrender.com
+
+PASOS SIGUIENTES
+-----------------
+
+1. Crear cuenta en Google Cloud Console:
+   - Habilitar Gmail API y Calendar API
+   - Crear OAuth 2.0 credentials
+   - Agregar redirect URI: https://agente-agenda-calendario-api.onrender.com/oauth/callback
+   - Obtener GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET
+
+2. Crear API Key de OpenAI:
+   - Ir a https://platform.openai.com/api-keys
+   - Crear nueva key
+   - Guardar como OPENAI_API_KEY
+
+3. Configurar variables de entorno en Render:
+   - Generar API keys internas (usa uuidgen o cualquier generador)
+   - Configurar DATABASE_URL desde la base de datos PostgreSQL
+   - Configurar todas las variables pendientes en ambos servicios
+
+4. Autorizar Google OAuth:
+   - Una vez configuradas las variables, ir a:
+     https://agente-agenda-calendario-api.onrender.com/oauth/start
+   - Autorizar acceso a Gmail y Calendar
+
+5. Escanear QR de WhatsApp:
+   - Ir a: https://agente-agenda-calendario.onrender.com/qr.png
+   - Escanear con WhatsApp
+
+COMANDOS ÚTILES
+----------------
+
+# Usar cuenta Orakron (esta cuenta)
+export RENDER_CLI_CONFIG_PATH=~/.render/cli-orakron.yaml
+
+# Usar cuenta Golder (la otra cuenta)
+export RENDER_CLI_CONFIG_PATH=~/.render/cli.yaml
+
+# Ver servicios
+render services list -o yaml
+
+# Ver logs del backend
+render logs srv-d5r9prm3jp1c73fio0g0 -o yaml
+
+# Ver logs del gateway
+render logs srv-d5r9prm3jp1c73fio0b0 -o yaml
+
+# Desplegar cambios (se hace automático con git push a main)
+git push origin main
+
+ENLACES IMPORTANTES
+--------------------
+
+Backend:
+- Dashboard: https://dashboard.render.com/web/srv-d5r9prm3jp1c73fio0g0
+- Status: https://agente-agenda-calendario-api.onrender.com/status
+- OAuth Start: https://agente-agenda-calendario-api.onrender.com/oauth/start
+- OAuth Status: https://agente-agenda-calendario-api.onrender.com/oauth/status
+
+WhatsApp Gateway:
+- Dashboard: https://dashboard.render.com/web/srv-d5r9prm3jp1c73fio0b0
+- Health: https://agente-agenda-calendario.onrender.com/health
+- QR Code: https://agente-agenda-calendario.onrender.com/qr.png
+
+Base de datos:
+- Dashboard: https://dashboard.render.com/d/dpg-d5r99kv5r7bs7392jovg-a

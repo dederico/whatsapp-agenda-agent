@@ -62,10 +62,47 @@ class AIClient:
             data["intent"] = "chat"
         return data
 
-    async def chat_response(self, text: str) -> str:
+    async def analyze_health_query(self, text: str) -> dict:
+        """Analiza consulta de salud y determina urgencia y necesidad de cita."""
         prompt = (
-            "Responde de forma humana y amigable. "
-            "Sé breve y útil. Si no sabes, pregunta por más detalle."
+            "Eres un consejero de salud. Analiza este mensaje y devuelve JSON con: "
+            "is_emergency (bool): true si es emergencia médica que requiere atención inmediata, "
+            "needs_appointment (bool): true si la persona debería agendar cita con doctor, "
+            "urgency (str): 'high', 'medium', 'low', "
+            "suggested_response (str): respuesta empática y profesional para el paciente. "
+            "Si es emergencia, recomienda FIRMEMENTE llamar al doctor o ir a emergencias. "
+            "Si necesita cita, sugiérelo amablemente."
+        )
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": text},
+            ],
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content or "{}"
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            data = {
+                "is_emergency": False,
+                "needs_appointment": False,
+                "urgency": "low",
+                "suggested_response": "Entiendo tu consulta. ¿Puedes darme más detalles?",
+            }
+        return data
+
+    async def chat_response(self, text: str) -> str:
+        """Respuesta simple como consejero de salud."""
+        prompt = (
+            "Eres un consejero de salud profesional y empático. "
+            "Tu objetivo es ayudar a las personas con consultas de salud, "
+            "brindar consejos básicos y detectar emergencias. "
+            "Sé cálido, profesional y breve en tus respuestas. "
+            "Si detectas una posible emergencia médica, recomienda firmemente "
+            "que llamen al doctor o acudan a emergencias de inmediato. "
+            "No des diagnósticos definitivos, solo orientación general."
         )
         response = await self.client.chat.completions.create(
             model=self.model,

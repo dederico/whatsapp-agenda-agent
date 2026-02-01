@@ -156,7 +156,22 @@ const sendMessage = async (toNumber, text) => {
     throw new Error('WhatsApp not initialized');
   }
   const jid = `${toNumber}@c.us`;
-  await client.sendText(jid, text);
+  try {
+    await client.sendText(jid, text);
+  } catch (err) {
+    const msg = String(err?.message || err);
+    if (msg.includes('WPP is not defined')) {
+      // Recover by reinitializing session; will require QR if session is lost.
+      try {
+        await client.close();
+      } catch {
+        // ignore
+      }
+      client = null;
+      await initWhatsApp();
+    }
+    throw err;
+  }
 };
 
 const getLastQr = () => lastQr;
