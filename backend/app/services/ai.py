@@ -228,7 +228,7 @@ class AIClient:
 
                 if not has_conflict:
                     # Formatear para el usuario
-                    day_name = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][day.weekday()]
+                    day_name = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"][day.weekday()]
                     available_slots.append({
                         "datetime": slot_start.isoformat(),
                         "display": f"{day_name} {day.day} de {slot_start.strftime('%B')} a las {hour}:00",
