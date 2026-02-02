@@ -80,15 +80,22 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                         slot_dt = datetime.fromisoformat(conversation.proposed_times[0]["datetime"])
                         end_dt = slot_dt + timedelta(hours=1)
 
-                        event_draft = CalendarEventDraft(
-                            title=f"Consulta - {incoming}",
-                            start=slot_dt.isoformat(),
-                            end=end_dt.isoformat(),
-                            location=OFFICE_LOCATIONS[selected_office],
-                            notes=f"Paciente: {incoming}\nSíntomas: {conversation.symptoms or 'No especificados'}",
-                        )
+                        # Crear payload en formato Google Calendar API
+                        event_payload = {
+                            "summary": f"Consulta - {incoming}",
+                            "start": {
+                                "dateTime": slot_dt.isoformat(),
+                                "timeZone": settings.scheduler_timezone
+                            },
+                            "end": {
+                                "dateTime": end_dt.isoformat(),
+                                "timeZone": settings.scheduler_timezone
+                            },
+                            "location": OFFICE_LOCATIONS[selected_office],
+                            "description": f"Paciente: {incoming}\nSíntomas: {conversation.symptoms or 'No especificados'}",
+                        }
 
-                        await calendar.create_event(event_draft)
+                        await calendar.create_event(event_payload)
                         state.log_event("appointment.created", f"patient={incoming} time={conversation.selected_time} office={selected_office}")
 
                         # Limpiar conversación
@@ -183,7 +190,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                 calendar = CalendarClient()
 
                 # Obtener eventos existentes para los próximos 7 días
-                tz = ZoneInfo(settings.timezone)
+                tz = ZoneInfo(settings.scheduler_timezone)
                 now = datetime.now(tz)
                 start_date = now
                 end_date = now + timedelta(days=7)
@@ -195,7 +202,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                 # Obtener slots disponibles
                 available_slots = await ai.suggest_available_slots(
                     existing_events,
-                    settings.timezone,
+                    settings.scheduler_timezone,
                     days_ahead=7
                 )
 
