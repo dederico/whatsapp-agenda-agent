@@ -183,30 +183,43 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         appointment_keywords = ["horario", "disponible", "cita", "agendar", "consulta", "mañana", "hoy", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo", "puedes"]
         is_asking_schedule = any(word in text for word in appointment_keywords)
 
+        print(f"[DETECCIÓN CITA] patient={incoming} needs_appt={needs_appointment} needs_info={needs_more_info} is_asking={is_asking_schedule} keywords={[w for w in appointment_keywords if w in text]}")
+        state.log_event("appointment.detection", f"patient={incoming} needs_appt={needs_appointment} needs_info={needs_more_info} is_asking={is_asking_schedule}")
+
         if (needs_appointment and not needs_more_info) or is_asking_schedule:
             # El usuario quiere agendar - revisar disponibilidad
+            print(f"[CITA EN PROCESO] ✓ Iniciando revisión de disponibilidad para patient={incoming}")
             try:
+                print(f"[CITA EN PROCESO] → Creando CalendarClient...")
                 state.log_event("calendar.check_start", f"patient={incoming}")
                 calendar = CalendarClient()
+                print(f"[CITA EN PROCESO] ✓ CalendarClient creado, service={'OK' if calendar.service else 'NULL'}")
+                state.log_event("calendar.client_created", f"patient={incoming} service={calendar.service is not None}")
 
                 # Obtener eventos existentes para los próximos 7 días
+                print(f"[CITA EN PROCESO] → Configurando zona horaria: {settings.scheduler_timezone}")
                 tz = ZoneInfo(settings.scheduler_timezone)
                 now = datetime.now(tz)
                 start_date = now
                 end_date = now + timedelta(days=7)
 
+                print(f"[CITA EN PROCESO] → Consultando eventos desde {start_date.isoformat()} hasta {end_date.isoformat()}")
                 state.log_event("calendar.list_events_start", f"patient={incoming} start={start_date.isoformat()} end={end_date.isoformat()}")
                 existing_events = await calendar.list_events(start_date, end_date)
+                print(f"[CITA EN PROCESO] ✓ Eventos obtenidos: {len(existing_events)} eventos encontrados")
                 state.log_event("calendar.list_events_success", f"patient={incoming} events_count={len(existing_events)}")
 
                 # Obtener slots disponibles
+                print(f"[CITA EN PROCESO] → Calculando slots disponibles...")
                 available_slots = await ai.suggest_available_slots(
                     existing_events,
                     settings.scheduler_timezone,
                     days_ahead=7
                 )
+                print(f"[CITA EN PROCESO] ✓ Slots disponibles: {len(available_slots)} slots encontrados")
 
                 if available_slots:
+                    print(f"[CITA EN PROCESO] → Creando conversación de agendamiento con {len(available_slots[:5])} opciones")
                     # Crear conversación de agendamiento
                     conversation = AppointmentConversation(
                         patient_number=incoming,
@@ -228,15 +241,23 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                     else:
                         response_text = suggested_response + "\n\n" + options_text
 
+                    print(f"[CITA EN PROCESO] ✓ Ofreciendo {len(available_slots[:5])} horarios al paciente")
                     state.log_event("appointment.slots_offered", f"patient={incoming} count={len(available_slots[:5])}")
                 else:
+                    print(f"[CITA EN PROCESO] ✗ No hay slots disponibles")
                     response_text = "Déjame revisar mi agenda... Actualmente no tengo horarios disponibles en los próximos días. ¿Podrías llamarme directamente para coordinar?"
                     state.log_event("appointment.no_slots", f"patient={incoming}")
 
             except Exception as exc:
                 import traceback
                 error_detail = traceback.format_exc()
-                state.log_event("calendar.error", f"patient={incoming} error={str(exc)} traceback={error_detail[:500]}")
+                print(f"[CITA EN PROCESO] ✗✗✗ ERROR ✗✗✗")
+                print(f"[CITA EN PROCESO] Error tipo: {type(exc).__name__}")
+                print(f"[CITA EN PROCESO] Error mensaje: {str(exc)}")
+                print(f"[CITA EN PROCESO] Traceback completo:")
+                print(error_detail)
+                state.log_event("calendar.error", f"patient={incoming} error_type={type(exc).__name__} error_msg={str(exc)}")
+                state.log_event("calendar.error_traceback", f"{error_detail}")
                 response_text = "Disculpa, dame un momento para revisar mi agenda. Si es urgente, puedes llamarme directamente."
 
         # Enviar respuesta
