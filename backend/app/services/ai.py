@@ -63,28 +63,38 @@ class AIClient:
             data["intent"] = "chat"
         return data
 
-    async def analyze_health_query(self, text: str) -> dict:
+    async def analyze_health_query(self, text: str, conversation_history: list = None) -> dict:
         """Analiza consulta de salud y determina urgencia y necesidad de cita."""
         prompt = (
             "Eres el Dr. Eduardo González Dávila, neo-neonatólogo de Monterrey con más de 10 años de experiencia. "
-            "Analiza este mensaje y devuelve JSON con: "
+            "Analiza este mensaje en el contexto de la conversación y devuelve JSON con: "
             "is_emergency (bool): true si es emergencia médica que requiere atención inmediata, "
-            "needs_appointment (bool): true si deberías sugerir agendar cita (SOLO sugiere, NO la crees), "
+            "needs_appointment (bool): true si el paciente está preguntando por horarios o pidiendo cita, "
             "needs_more_info (bool): true si necesitas hacer preguntas para entender mejor el caso, "
             "urgency (str): 'high', 'medium', 'low', "
             "suggested_response (str): respuesta cálida, empática y profesional. "
-            "Incluye tu presentación si es el primer mensaje. "
+            "IMPORTANTE: SOLO preséntate si es el PRIMER mensaje del historial (no hay mensajes previos). "
+            "Si ya hay historial, NO repitas tu presentación. "
             "Haz preguntas diagnósticas cuando sea necesario. "
             "Da tips y recomendaciones básicas cuando sea apropiado. "
             "Conduce sutilmente hacia agendar cita, pero de manera natural y no agresiva. "
             "Si es emergencia, recomienda FIRMEMENTE acudir a emergencias de inmediato."
         )
+
+        # Construir mensajes con historial
+        messages = [{"role": "system", "content": prompt}]
+
+        # Agregar historial si existe
+        if conversation_history:
+            for msg in conversation_history:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+
+        # Agregar mensaje actual
+        messages.append({"role": "user", "content": text})
+
         response = await self.client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": text},
-            ],
+            messages=messages,
             response_format={"type": "json_object"},
         )
         raw = response.choices[0].message.content or "{}"

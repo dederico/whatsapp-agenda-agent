@@ -40,7 +40,13 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         ai = AIClient(settings.openai_api_key)
         text = message.text.lower().strip()
 
-        # Obtener conversación existente si hay una
+        # Guardar mensaje del usuario en historial
+        state.add_message_to_history(incoming, "user", message.text)
+
+        # Obtener historial conversacional
+        history = state.get_conversation_history(incoming)
+
+        # Obtener conversación de agendamiento si hay una
         conversation = state.get_appointment_conversation(incoming)
 
         # Si hay una conversación de agendamiento activa
@@ -95,12 +101,16 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                         OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
                     )
 
+                    # Guardar respuesta en historial
+                    state.add_message_to_history(incoming, "assistant", response_text)
+
                     return {"status": "appointment_confirmed"}
                 else:
                     response_text = "No entendí bien. ¿En cuál consultorio prefieres tu cita?\n- Muguerza\n- Zambrano\n- IMSS"
                     await gateway.send_message(
                         OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
                     )
+                    state.add_message_to_history(incoming, "assistant", response_text)
                     return {"status": "waiting_office_selection"}
 
             # Estado: eligiendo horario
@@ -132,16 +142,18 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                         OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
                     )
 
+                    state.add_message_to_history(incoming, "assistant", response_text)
                     return {"status": "waiting_office_selection"}
                 else:
                     response_text = "No entendí bien. Por favor elige el número de la opción que prefieres (1, 2, 3, etc.)"
                     await gateway.send_message(
                         OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
                     )
+                    state.add_message_to_history(incoming, "assistant", response_text)
                     return {"status": "waiting_time_selection"}
 
         # No hay conversación activa o está en estado inicial - analizar como consulta de salud normal
-        analysis = await ai.analyze_health_query(message.text)
+        analysis = await ai.analyze_health_query(message.text, conversation_history=history)
 
         is_emergency = analysis.get("is_emergency", False)
         needs_appointment = analysis.get("needs_appointment", False)
@@ -160,54 +172,65 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         if is_emergency:
             state.log_event("health.emergency", f"from={incoming} message={message.text[:50]}")
 
-        # Si el análisis sugiere que necesita cita Y no necesita más info
-        if needs_appointment and not needs_more_info:
-            # Verificar si el usuario está aceptando agendar
-            if any(word in text for word in ["sí", "si", "dale", "okay", "ok", "claro", "agendar", "cita"]):
-                try:
-                    calendar = CalendarClient()
+        # Si el análisis sugiere que necesita cita O el usuario está preguntando explícitamente por horarios
+        appointment_keywords = ["horario", "disponible", "cita", "agendar", "consulta", "mañana", "hoy", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo", "puedes"]
+        is_asking_schedule = any(word in text for word in appointment_keywords)
 
-                    # Obtener eventos existentes para los próximos 7 días
-                    tz = ZoneInfo(settings.timezone)
-                    now = datetime.now(tz)
-                    start_date = now.isoformat()
-                    end_date = (now + timedelta(days=7)).isoformat()
+        if (needs_appointment and not needs_more_info) or is_asking_schedule:
+            # El usuario quiere agendar - revisar disponibilidad
+            try:
+                state.log_event("calendar.check_start", f"patient={incoming}")
+                calendar = CalendarClient()
 
-                    existing_events = await calendar.list_events(start_date, end_date)
+                # Obtener eventos existentes para los próximos 7 días
+                tz = ZoneInfo(settings.timezone)
+                now = datetime.now(tz)
+                start_date = now.isoformat()
+                end_date = (now + timedelta(days=7)).isoformat()
 
-                    # Obtener slots disponibles
-                    available_slots = await ai.suggest_available_slots(
-                        existing_events,
-                        settings.timezone,
-                        days_ahead=7
+                state.log_event("calendar.list_events_start", f"patient={incoming} start={start_date} end={end_date}")
+                existing_events = await calendar.list_events(start_date, end_date)
+                state.log_event("calendar.list_events_success", f"patient={incoming} events_count={len(existing_events)}")
+
+                # Obtener slots disponibles
+                available_slots = await ai.suggest_available_slots(
+                    existing_events,
+                    settings.timezone,
+                    days_ahead=7
+                )
+
+                if available_slots:
+                    # Crear conversación de agendamiento
+                    conversation = AppointmentConversation(
+                        patient_number=incoming,
+                        state="scheduling",
+                        symptoms=message.text[:200],
+                        proposed_times=available_slots[:5],  # Máximo 5 opciones
                     )
+                    state.set_appointment_conversation(incoming, conversation)
 
-                    if available_slots:
-                        # Crear conversación de agendamiento
-                        conversation = AppointmentConversation(
-                            patient_number=incoming,
-                            state="scheduling",
-                            symptoms=message.text[:200],
-                            proposed_times=available_slots[:5],  # Máximo 5 opciones
-                        )
-                        state.set_appointment_conversation(incoming, conversation)
+                    # Construir mensaje con opciones
+                    options_text = "Tengo disponibilidad en los siguientes horarios:\n\n"
+                    for idx, slot in enumerate(available_slots[:5], 1):
+                        options_text += f"{idx}. {slot['display']}\n"
+                    options_text += "\n¿Cuál te acomoda mejor? (responde con el número)"
 
-                        # Construir mensaje con opciones
-                        options_text = "Tengo disponibilidad en los siguientes horarios:\n\n"
-                        for idx, slot in enumerate(available_slots[:5], 1):
-                            options_text += f"{idx}. {slot['display']}\n"
-                        options_text += "\n¿Cuál te acomoda mejor? (responde con el número)"
-
+                    # Si suggested_response ya incluye info de cita, no duplicar
+                    if "disponib" in suggested_response.lower() or "horario" in suggested_response.lower():
+                        response_text = options_text
+                    else:
                         response_text = suggested_response + "\n\n" + options_text
 
-                        state.log_event("appointment.slots_offered", f"patient={incoming} count={len(available_slots[:5])}")
-                    else:
-                        response_text += "\n\nActualmente no tengo horarios disponibles en los próximos días. ¿Podrías llamarme directamente para coordinar?"
-                        state.log_event("appointment.no_slots", f"patient={incoming}")
+                    state.log_event("appointment.slots_offered", f"patient={incoming} count={len(available_slots[:5])}")
+                else:
+                    response_text = "Déjame revisar mi agenda... Actualmente no tengo horarios disponibles en los próximos días. ¿Podrías llamarme directamente para coordinar?"
+                    state.log_event("appointment.no_slots", f"patient={incoming}")
 
-                except Exception as exc:
-                    state.log_event("calendar.error", f"patient={incoming} error={str(exc)}")
-                    response_text += "\n\nDisculpa, tuve un problema al revisar la agenda. ¿Podrías llamarme directamente?"
+            except Exception as exc:
+                import traceback
+                error_detail = traceback.format_exc()
+                state.log_event("calendar.error", f"patient={incoming} error={str(exc)} traceback={error_detail[:500]}")
+                response_text = "Disculpa, dame un momento para revisar mi agenda. Si es urgente, puedes llamarme directamente."
 
         # Enviar respuesta
         await gateway.send_message(
@@ -216,6 +239,9 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                 text=response_text,
             )
         )
+
+        # Guardar respuesta en historial
+        state.add_message_to_history(incoming, "assistant", response_text)
 
         state.log_event("whatsapp.response_sent", f"to={incoming} emergency={is_emergency} appt={needs_appointment}")
 
@@ -227,15 +253,19 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         }
 
     except Exception as exc:
-        state.log_event("whatsapp.error", f"from={incoming} error={str(exc)}")
+        import traceback
+        error_detail = traceback.format_exc()
+        state.log_event("whatsapp.error", f"from={incoming} error={str(exc)} traceback={error_detail[:500]}")
         # En caso de error, enviar respuesta genérica
         try:
+            error_response = "Disculpa, estoy teniendo problemas técnicos. Por favor intenta de nuevo o llama al doctor directamente si es urgente."
             await gateway.send_message(
                 OutgoingWhatsAppMessage(
                     to_number=message.from_number,
-                    text="Disculpa, estoy teniendo problemas técnicos. Por favor intenta de nuevo o llama al doctor directamente si es urgente.",
+                    text=error_response,
                 )
             )
+            state.add_message_to_history(incoming, "assistant", error_response)
         except Exception:
             pass
         raise HTTPException(status_code=500, detail=str(exc))

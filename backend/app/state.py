@@ -36,6 +36,7 @@ class InMemoryState:
         self.reminders_sent: set[str] = set()
         self.last_reco_date: str | None = None
         self.seen_email_ids: set[str] = set()
+        self.conversation_history: Dict[str, deque] = {}  # {patient_number: deque([{role, content, timestamp}])}
 
     def set_pending(self, user_number: str, action: PendingEmailAction):
         self.pending_by_user[user_number] = action
@@ -80,6 +81,25 @@ class InMemoryState:
     def clear_appointment_conversation(self, patient_number: str):
         if patient_number in self.appointment_conversations:
             del self.appointment_conversations[patient_number]
+
+    # Métodos para gestionar historial conversacional
+    def add_message_to_history(self, patient_number: str, role: str, content: str):
+        if patient_number not in self.conversation_history:
+            self.conversation_history[patient_number] = deque(maxlen=20)  # Últimos 20 mensajes
+        self.conversation_history[patient_number].append({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
+    def get_conversation_history(self, patient_number: str) -> list:
+        if patient_number not in self.conversation_history:
+            return []
+        return list(self.conversation_history[patient_number])
+
+    def clear_conversation_history(self, patient_number: str):
+        if patient_number in self.conversation_history:
+            del self.conversation_history[patient_number]
 
 
 state = InMemoryState()
