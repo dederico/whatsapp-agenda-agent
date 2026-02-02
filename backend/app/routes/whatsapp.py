@@ -185,10 +185,10 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                 # Obtener eventos existentes para los próximos 7 días
                 tz = ZoneInfo(settings.timezone)
                 now = datetime.now(tz)
-                start_date = now.isoformat()
-                end_date = (now + timedelta(days=7)).isoformat()
+                start_date = now
+                end_date = now + timedelta(days=7)
 
-                state.log_event("calendar.list_events_start", f"patient={incoming} start={start_date} end={end_date}")
+                state.log_event("calendar.list_events_start", f"patient={incoming} start={start_date.isoformat()} end={end_date.isoformat()}")
                 existing_events = await calendar.list_events(start_date, end_date)
                 state.log_event("calendar.list_events_success", f"patient={incoming} events_count={len(existing_events)}")
 
