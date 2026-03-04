@@ -127,8 +127,36 @@ COMMITS RECIENTES
 1. fc974cc - feat: calendar-aware appointment scheduling
 2. b705d63 - feat: add conversation history and improve scheduling
 
-CAMBIOS IMPORTANTES - 2026-03-04
-----------------------------------
+CAMBIOS MAYORES - 2026-03-04 (TARDE)
+-------------------------------------
+FLUJO 100% CONVERSACIONAL CON LLM (Sin menús)
+
+El sistema ahora usa LLM para TODO el flujo, eliminando menús rígidos:
+
+1. EXTRACCIÓN INTELIGENTE CON AI:
+   - Nueva función: extract_appointment_info()
+   - Analiza TODA la conversación (no solo último mensaje)
+   - Extrae automáticamente: doctor recomendado, ubicación preferida, síntomas, fecha
+   - Determina cuándo está listo para ofrecer horarios
+
+2. VALORES SE GUARDAN AUTOMÁTICAMENTE:
+   - Doctor → conversation.selected_doctor (fernandez/paredes/perez)
+   - Ubicación → conversation.selected_office (calle13/calle09)
+   - Síntomas → conversation.symptoms
+   - Horario → conversation.selected_time
+
+3. CONVERSACIÓN NATURAL (No menús):
+   - El usuario puede decir "Dr. Fernandez" o "el pediatra" → AI entiende
+   - Puede decir "la de Calle 13" o "la del centro" → AI entiende
+   - No necesita decir números (1, 2, 3), pero también funciona
+
+4. FLUJO SIMPLIFICADO:
+   - Estado único: "conversing" (no más choosing_doctor, choosing_office, etc.)
+   - Cuando tiene doctor + ubicación + horario → crea cita automáticamente
+   - Trazabilidad completa: todos los valores quedan guardados
+
+CAMBIOS IMPORTANTES - 2026-03-04 (MAÑANA)
+------------------------------------------
 ADAPTACIÓN PARA HOSPITAL DE ESPECIALIDADES (PRUEBAS HOY)
 
 1. CONTEXTO DEL BOT ACTUALIZADO:
