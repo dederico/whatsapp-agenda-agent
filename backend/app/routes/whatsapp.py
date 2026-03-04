@@ -202,7 +202,9 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                     return {"status": "calendar_error"}
 
         # No hay conversación activa o está en estado inicial - usar respuesta conversacional del LLM
+        print(f"[DEFAULT RESPONSE PATH] No conversation or not offering slots, using analyze_health_query")
         analysis = await ai.analyze_health_query(message.text, conversation_history=history)
+        print(f"[ANALYSIS RESULT] emergency={analysis.get('is_emergency')} needs_appt={analysis.get('needs_appointment')} response={analysis.get('suggested_response', '')[:100]}")
 
         is_emergency = analysis.get("is_emergency", False)
         needs_appointment = analysis.get("needs_appointment", False)
@@ -217,6 +219,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
         # Usar respuesta conversacional del LLM
         response_text = suggested_response
+        print(f"[SENDING RESPONSE] to={incoming} text={response_text[:100]}")
 
         # Si es emergencia, loguear
         if is_emergency:
