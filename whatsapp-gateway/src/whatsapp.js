@@ -142,8 +142,9 @@ const initWhatsApp = async () => {
       });
       if (!res.ok) {
         const body = await res.text();
+        const truncated = body.length > 200 ? body.substring(0, 200) + '...' : body;
         console.error(
-          `[agenda-agent] webhook failed ${res.status} ${res.statusText}: ${body}`
+          `[agenda-agent] webhook failed ${res.status} ${res.statusText}: ${truncated}`
         );
       } else {
         console.error('[agenda-agent] webhook delivered');

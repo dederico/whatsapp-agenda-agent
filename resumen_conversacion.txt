@@ -211,3 +211,32 @@ CAMBIOS PREVIOS CONSERVADOS
 - Mantiene contexto de conversación completa
 - Detecta mejor la intención de agendar citas
 - Logging detallado para debug de problemas
+
+CAMBIOS CRÍTICOS - 2026-03-04 (NOCHE)
+--------------------------------------
+FIX: WhatsApp Gateway bloqueaba mensajes de pacientes
+
+PROBLEMA DETECTADO:
+- El gateway tenía un sistema de blocklist que rechazaba mensajes
+- Log mostraba: "[agenda-agent] MSG blocked from=5218123360242"
+- El bot solo aceptaba mensajes del owner, NO de pacientes
+- Esto impedía que el hospital recibiera consultas de pacientes
+
+CAUSA RAÍZ:
+- whatsapp-gateway/src/whatsapp.js líneas 118-122
+- Verificaba env var WHATSAPP_BLOCKLIST y bloqueaba números
+- Lógica invertida: bloqueaba en vez de permitir
+
+SOLUCIÓN IMPLEMENTADA:
+- Eliminé completamente la verificación de blocklist
+- Código modificado en whatsapp-gateway/src/whatsapp.js:118
+- Comentario agregado: "HOSPITAL BOT: Accept messages from ALL users (patients)"
+- Commit: fix: remove blocklist to accept messages from all users
+
+COMPORTAMIENTO NUEVO:
+✅ RECIBE mensajes de CUALQUIER número (pacientes)
+✅ ENVÍA respuestas a esos pacientes
+✅ Solo el OWNER recibe notificaciones administrativas
+
+ARCHIVOS MODIFICADOS:
+- whatsapp-gateway/src/whatsapp.js (eliminó blocklist check)

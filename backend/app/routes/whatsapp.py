@@ -36,7 +36,9 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
     Health counselor bot - accepts ALL incoming WhatsApp messages,
     analyzes them as health queries, and responds automatically.
     """
+    print(f"[RAW FROM_NUMBER] raw={message.from_number}")
     incoming = _normalize_number(message.from_number)
+    print(f"[NORMALIZED] normalized={incoming}")
     state.log_event("whatsapp.incoming", f"from={message.from_number} text={message.text[:100]}")
 
     try:

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp QR Code</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        #qrcode {
+            margin: 20px 0;
+        }
+        button {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #1da851;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .loading { background: #fff3cd; color: #856404; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WhatsApp QR Code</h1>
+        <p>Escanea este código QR con WhatsApp</p>
+
+        <div id="status" class="status loading">Cargando QR...</div>
+
+        <div id="qrcode"></div>
+
+        <button onclick="loadQR()">🔄 Recargar QR</button>
+        <button onclick="checkStatus()">✓ Verificar Conexión</button>
+
+        <p style="margin-top: 20px; color: #666; font-size: 14px;">
+            <strong>Instrucciones:</strong><br>
+            1. Abre WhatsApp en tu teléfono<br>
+            2. Ve a Configuración → Dispositivos vinculados<br>
+            3. Toca "Vincular un dispositivo"<br>
+            4. Escanea el código QR
+        </p>
+    </div>
+
+    <script>
+        const API_URL = 'https://agente-agenda-calendario.onrender.com';
+
+        async function loadQR() {
+            const statusDiv = document.getElementById('status');
+            const qrcodeDiv = document.getElementById('qrcode');
+
+            statusDiv.className = 'status loading';
+            statusDiv.textContent = 'Cargando QR...';
+            qrcodeDiv.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_URL}/qr`);
+                const data = await response.json();
+
+                if (data.qr) {
+                    // Mostrar el QR
+                    const img = document.createElement('img');
+                    img.src = 'data:image/png;base64,' + data.qr;
+                    img.style.maxWidth = '400px';
+                    qrcodeDiv.appendChild(img);
+
+                    statusDiv.className = 'status';
+                    statusDiv.textContent = '✓ QR listo para escanear';
+                } else if (data.message) {
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = '✓ ' + data.message;
+                } else {
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = '❌ Error al cargar QR';
+                }
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ Error: ' + error.message;
+            }
+        }
+
+        async function checkStatus() {
+            const statusDiv = document.getElementById('status');
+
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = '✓ Gateway conectado';
+
+                    // Intentar obtener nuevo QR
+                    setTimeout(loadQR, 1000);
+                }
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ Error al verificar: ' + error.message;
+            }
+        }
+
+        // Cargar QR automáticamente al abrir la página
+        loadQR();
+
+        // Refrescar QR cada 30 segundos
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>
