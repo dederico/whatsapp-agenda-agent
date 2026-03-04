@@ -5,6 +5,8 @@ const path = require('path');
 let client = null;
 let lastQr = null;
 let tokenFolder = null;
+// Cache of number -> JID mappings for replying
+const jidCache = new Map();
 
 const parseBlocklist = () => {
   const raw = process.env.WHATSAPP_BLOCKLIST || '';
@@ -115,6 +117,11 @@ const initWhatsApp = async () => {
     if (!from || !text) {
       return;
     }
+    // Cache the JID for this number so we can reply correctly
+    if (message.from && from) {
+      jidCache.set(from, message.from);
+      console.error(`[agenda-agent] Cached JID: ${from} -> ${message.from}`);
+    }
     // HOSPITAL BOT: Accept messages from ALL users (patients)
     console.error('[agenda-agent] INBOUND_HOOK_TEST');
     const backendUrl = process.env.BACKEND_URL;
@@ -151,7 +158,9 @@ const sendMessage = async (toNumber, text) => {
   if (!client) {
     throw new Error('WhatsApp not initialized');
   }
-  const jid = `${toNumber}@c.us`;
+  // Use cached JID if available, otherwise construct it
+  const jid = jidCache.get(toNumber) || `${toNumber}@c.us`;
+  console.error(`[agenda-agent] Sending to ${toNumber} using JID: ${jid}`);
   try {
     await client.sendText(jid, text);
   } catch (err) {
