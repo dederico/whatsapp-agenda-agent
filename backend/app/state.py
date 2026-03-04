@@ -17,14 +17,14 @@ class PendingEmailAction:
 
 @dataclass
 class AppointmentConversation:
-    """Trackea el estado de una conversación de agendamiento de cita."""
+    """Trackea el estado de una conversación de agendamiento de cita - Flujo conversacional con AI."""
     patient_number: str
-    state: str = "initial"  # initial | scheduling | choosing_doctor | choosing_office | confirming
+    state: str = "conversing"  # conversing (flujo conversacional) | confirmed
     symptoms: Optional[str] = None
     proposed_times: list = field(default_factory=list)  # Lista de horarios propuestos
     selected_time: Optional[str] = None
-    selected_doctor: Optional[str] = None  # fernandez | paredes | perez
-    selected_office: Optional[str] = None  # calle13 | calle09
+    selected_doctor: Optional[str] = None  # fernandez | paredes | perez (extraído por AI)
+    selected_office: Optional[str] = None  # calle13 | calle09 (extraído por AI)
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_updated: datetime = field(default_factory=datetime.utcnow)
 

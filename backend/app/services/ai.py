@@ -110,37 +110,54 @@ class AIClient:
             }
         return data
 
-    async def interpret_selection(self, user_input: str, options: dict) -> str:
-        """Interpreta la selección del usuario usando AI en lugar de keywords."""
-        options_text = "\n".join([f"- {key}: {value}" for key, value in options.items()])
-
+    async def extract_appointment_info(self, conversation_history: list) -> dict:
+        """Extrae información de agendamiento de toda la conversación usando AI."""
         prompt = (
-            f"El usuario está eligiendo entre estas opciones:\n{options_text}\n\n"
-            f"Usuario dijo: '{user_input}'\n\n"
-            f"Devuelve JSON con:\n"
-            f"selected_key (str): la clave de la opción elegida (o null si no está clara)\n"
-            f"confidence (str): 'high', 'medium', 'low'\n\n"
-            f"Ejemplos:\n"
-            f"- Si dice '1' o 'primera' → primera opción\n"
-            f"- Si menciona el nombre del doctor/ubicación → esa opción\n"
-            f"- Si no está claro → selected_key: null"
+            "Eres un asistente del Hospital de Especialidades. Analiza TODA la conversación y extrae información para agendar una cita.\n\n"
+            "Doctores disponibles:\n"
+            "- fernandez: Dr. Jose Fernandez (Consultas Generales) - para consultas generales de adultos\n"
+            "- paredes: Dr. Juan Paredes (Pediatría) - para niños, bebés, adolescentes\n"
+            "- perez: Dr. Pedro Perez (Neurología) - para problemas neurológicos, dolores de cabeza, mareos\n\n"
+            "Ubicaciones:\n"
+            "- calle13: Calle 13, Número 111 (zona centro)\n"
+            "- calle09: Calle 09, Número 120 (zona norte)\n\n"
+            "Devuelve JSON con:\n"
+            "- recommended_doctor (str): código del doctor apropiado según síntomas (fernandez/paredes/perez o null)\n"
+            "- wants_appointment (bool): true si claramente quiere agendar cita\n"
+            "- preferred_location (str): código de ubicación si mencionó preferencia (calle13/calle09 o null)\n"
+            "- preferred_date_mention (str): si mencionó fecha ('mañana', 'lunes', fecha específica, o null)\n"
+            "- symptoms_summary (str): resumen breve de síntomas/motivo (max 100 caracteres)\n"
+            "- ready_to_offer_slots (bool): true si tiene suficiente info y quiere agendar\n"
+            "- needs_clarification (str): qué información falta para agendar (o null si está todo)\n\n"
+            "IMPORTANTE: Analiza el contexto COMPLETO, no solo el último mensaje. Si ya identificaste doctor/ubicación en mensajes anteriores, mantenlos."
         )
+
+        messages = [{"role": "system", "content": prompt}]
+
+        # Agregar toda la conversación
+        if conversation_history:
+            for msg in conversation_history:
+                messages.append({"role": msg["role"], "content": msg["content"]})
 
         response = await self.client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user_input}
-            ],
+            messages=messages,
             response_format={"type": "json_object"},
         )
 
         raw = response.choices[0].message.content or "{}"
         try:
-            data = json.loads(raw)
-            return data.get("selected_key")
+            return json.loads(raw)
         except json.JSONDecodeError:
-            return None
+            return {
+                "recommended_doctor": None,
+                "wants_appointment": False,
+                "preferred_location": None,
+                "preferred_date_mention": None,
+                "symptoms_summary": "",
+                "ready_to_offer_slots": False,
+                "needs_clarification": "Error al procesar"
+            }
 
     async def chat_response(self, text: str) -> str:
         """Respuesta como asistente del Hospital de Especialidades."""
