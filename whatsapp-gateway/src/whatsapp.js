@@ -115,11 +115,7 @@ const initWhatsApp = async () => {
     if (!from || !text) {
       return;
     }
-    const blocklist = parseBlocklist();
-    if (isBlocked(blocklist, message, from)) {
-      console.error(`[agenda-agent] MSG blocked from=${from}`);
-      return;
-    }
+    // HOSPITAL BOT: Accept messages from ALL users (patients)
     console.error('[agenda-agent] INBOUND_HOOK_TEST');
     const backendUrl = process.env.BACKEND_URL;
     if (!backendUrl) {
