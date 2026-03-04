@@ -25,10 +25,8 @@ OFFICE_LOCATIONS = {
 
 
 def _normalize_number(raw: str) -> str:
-    # Strip non-digits and normalize MX mobile (52/521) prefixes.
+    # Strip non-digits, keep number as-is for WhatsApp
     digits = "".join(ch for ch in (raw or "") if ch.isdigit())
-    if digits.startswith("521"):
-        return "52" + digits[3:]
     return digits
 
 
