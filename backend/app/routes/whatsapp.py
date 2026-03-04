@@ -58,13 +58,10 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
         if conversation:
             # Estado: eligiendo ubicación
             if conversation.state == "choosing_office":
-                selected_office = None
-                if "calle13" in text or "calle 13" in text or "13" in text:
-                    selected_office = "calle13"
-                elif "calle09" in text or "calle 09" in text or "09" in text or "9" in text:
-                    selected_office = "calle09"
+                # Usar AI para interpretar la selección
+                selected_office = await ai.interpret_selection(message.text, OFFICE_LOCATIONS)
 
-                if selected_office:
+                if selected_office and selected_office in OFFICE_LOCATIONS:
                     conversation.selected_office = selected_office
                     conversation.state = "confirming"
                     state.set_appointment_conversation(incoming, conversation)
@@ -116,7 +113,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
                     return {"status": "appointment_confirmed"}
                 else:
-                    response_text = "No entendí bien. ¿En cuál ubicación prefieres tu cita?\n1. Calle 13, Número 111\n2. Calle 09, Número 120"
+                    response_text = "Disculpa, no logré entender cuál ubicación prefieres. Puedes decirme:\n• Calle 13\n• Calle 09\n\nO simplemente el número de opción (1 o 2)"
                     await gateway.send_message(
                         OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
                     )
@@ -125,15 +122,10 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
             # Estado: eligiendo doctor
             elif conversation.state == "choosing_doctor":
-                selected_doctor = None
-                if "fernandez" in text or "jose" in text or "general" in text or "1" in text:
-                    selected_doctor = "fernandez"
-                elif "paredes" in text or "juan" in text or "pediatr" in text or "niño" in text or "2" in text:
-                    selected_doctor = "paredes"
-                elif "perez" in text or "pedro" in text or "neurol" in text or "3" in text:
-                    selected_doctor = "perez"
+                # Usar AI para interpretar la selección
+                selected_doctor = await ai.interpret_selection(message.text, DOCTORS)
 
-                if selected_doctor:
+                if selected_doctor and selected_doctor in DOCTORS:
                     conversation.selected_doctor = selected_doctor
                     conversation.state = "choosing_office"
                     state.set_appointment_conversation(incoming, conversation)
@@ -152,7 +144,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                     state.add_message_to_history(incoming, "assistant", response_text)
                     return {"status": "waiting_office_selection"}
                 else:
-                    response_text = "No entendí bien. Por favor elige el número del doctor:\n1. Dr. Jose Fernandez (Consultas Generales)\n2. Dr. Juan Paredes (Pediatría)\n3. Dr. Pedro Perez (Neurología)"
+                    response_text = "Disculpa, no logré entender con cuál doctor deseas agendar. Puedes mencionar:\n• Dr. Fernandez (Consultas Generales)\n• Dr. Paredes (Pediatría)\n• Dr. Perez (Neurología)\n\nO simplemente el número de opción (1, 2 o 3)"
                     await gateway.send_message(
                         OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
                     )

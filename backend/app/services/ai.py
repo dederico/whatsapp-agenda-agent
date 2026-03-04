@@ -110,6 +110,38 @@ class AIClient:
             }
         return data
 
+    async def interpret_selection(self, user_input: str, options: dict) -> str:
+        """Interpreta la selección del usuario usando AI en lugar de keywords."""
+        options_text = "\n".join([f"- {key}: {value}" for key, value in options.items()])
+
+        prompt = (
+            f"El usuario está eligiendo entre estas opciones:\n{options_text}\n\n"
+            f"Usuario dijo: '{user_input}'\n\n"
+            f"Devuelve JSON con:\n"
+            f"selected_key (str): la clave de la opción elegida (o null si no está clara)\n"
+            f"confidence (str): 'high', 'medium', 'low'\n\n"
+            f"Ejemplos:\n"
+            f"- Si dice '1' o 'primera' → primera opción\n"
+            f"- Si menciona el nombre del doctor/ubicación → esa opción\n"
+            f"- Si no está claro → selected_key: null"
+        )
+
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user_input}
+            ],
+            response_format={"type": "json_object"},
+        )
+
+        raw = response.choices[0].message.content or "{}"
+        try:
+            data = json.loads(raw)
+            return data.get("selected_key")
+        except json.JSONDecodeError:
+            return None
+
     async def chat_response(self, text: str) -> str:
         """Respuesta como asistente del Hospital de Especialidades."""
         prompt = (
