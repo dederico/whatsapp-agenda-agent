@@ -12,10 +12,15 @@ from ..state import state, AppointmentConversation
 router = APIRouter()
 gateway = WhatsAppGateway()
 
+DOCTORS = {
+    "fernandez": "Dr. Jose Fernandez (Consultas Generales)",
+    "paredes": "Dr. Juan Paredes (Pediatría)",
+    "perez": "Dr. Pedro Perez (Neurología)",
+}
+
 OFFICE_LOCATIONS = {
-    "muguerza": "Hospital Muguerza Alta Especialidad, Av. Hidalgo 2525, Monterrey, N.L.",
-    "zambrano": "Hospital Zambrano Hellion, San Pedro Garza García, N.L.",
-    "imss": "IMSS, Monterrey, N.L.",
+    "calle13": "Calle 13, Número 111",
+    "calle09": "Calle 09, Número 120",
 }
 
 
@@ -51,15 +56,13 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
         # Si hay una conversación de agendamiento activa
         if conversation:
-            # Estado: eligiendo consultorio
+            # Estado: eligiendo ubicación
             if conversation.state == "choosing_office":
                 selected_office = None
-                if "muguerza" in text:
-                    selected_office = "muguerza"
-                elif "zambrano" in text:
-                    selected_office = "zambrano"
-                elif "imss" in text:
-                    selected_office = "imss"
+                if "calle13" in text or "calle 13" in text or "13" in text:
+                    selected_office = "calle13"
+                elif "calle09" in text or "calle 09" in text or "09" in text or "9" in text:
+                    selected_office = "calle09"
 
                 if selected_office:
                     conversation.selected_office = selected_office
@@ -67,9 +70,9 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                     state.set_appointment_conversation(incoming, conversation)
 
                     response_text = (
-                        f"Perfecto! He agendado tu cita para {conversation.selected_time} "
-                        f"en {OFFICE_LOCATIONS[selected_office]}.\n\n"
-                        f"Te espero ese día. Si necesitas reagendar o tienes alguna duda, escríbeme."
+                        f"Perfecto! He agendado tu cita con {DOCTORS[conversation.selected_doctor]} "
+                        f"para {conversation.selected_time} en {OFFICE_LOCATIONS[selected_office]}.\n\n"
+                        f"Te esperamos ese día. Si necesitas reagendar o tienes alguna duda, escríbeme."
                     )
 
                     # Crear evento en Google Calendar
@@ -82,7 +85,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
                         # Crear payload en formato Google Calendar API
                         event_payload = {
-                            "summary": f"Consulta - {incoming}",
+                            "summary": f"{DOCTORS[conversation.selected_doctor]} - {incoming}",
                             "start": {
                                 "dateTime": slot_dt.isoformat(),
                                 "timeZone": settings.scheduler_timezone
@@ -92,11 +95,11 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                                 "timeZone": settings.scheduler_timezone
                             },
                             "location": OFFICE_LOCATIONS[selected_office],
-                            "description": f"Paciente: {incoming}\nSíntomas: {conversation.symptoms or 'No especificados'}",
+                            "description": f"Paciente: {incoming}\nDoctor: {DOCTORS[conversation.selected_doctor]}\nMotivo: {conversation.symptoms or 'No especificado'}",
                         }
 
                         await calendar.create_event(event_payload)
-                        state.log_event("appointment.created", f"patient={incoming} time={conversation.selected_time} office={selected_office}")
+                        state.log_event("appointment.created", f"patient={incoming} doctor={conversation.selected_doctor} time={conversation.selected_time} office={selected_office}")
 
                         # Limpiar conversación
                         state.clear_appointment_conversation(incoming)
@@ -113,12 +116,48 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
                     return {"status": "appointment_confirmed"}
                 else:
-                    response_text = "No entendí bien. ¿En cuál consultorio prefieres tu cita?\n- Muguerza\n- Zambrano\n- IMSS"
+                    response_text = "No entendí bien. ¿En cuál ubicación prefieres tu cita?\n1. Calle 13, Número 111\n2. Calle 09, Número 120"
                     await gateway.send_message(
                         OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
                     )
                     state.add_message_to_history(incoming, "assistant", response_text)
                     return {"status": "waiting_office_selection"}
+
+            # Estado: eligiendo doctor
+            elif conversation.state == "choosing_doctor":
+                selected_doctor = None
+                if "fernandez" in text or "jose" in text or "general" in text or "1" in text:
+                    selected_doctor = "fernandez"
+                elif "paredes" in text or "juan" in text or "pediatr" in text or "niño" in text or "2" in text:
+                    selected_doctor = "paredes"
+                elif "perez" in text or "pedro" in text or "neurol" in text or "3" in text:
+                    selected_doctor = "perez"
+
+                if selected_doctor:
+                    conversation.selected_doctor = selected_doctor
+                    conversation.state = "choosing_office"
+                    state.set_appointment_conversation(incoming, conversation)
+
+                    response_text = (
+                        f"Excelente! Has elegido {DOCTORS[selected_doctor]}.\n\n"
+                        f"¿En cuál ubicación prefieres tu cita?\n"
+                        f"1. Calle 13, Número 111\n"
+                        f"2. Calle 09, Número 120"
+                    )
+
+                    await gateway.send_message(
+                        OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
+                    )
+
+                    state.add_message_to_history(incoming, "assistant", response_text)
+                    return {"status": "waiting_office_selection"}
+                else:
+                    response_text = "No entendí bien. Por favor elige el número del doctor:\n1. Dr. Jose Fernandez (Consultas Generales)\n2. Dr. Juan Paredes (Pediatría)\n3. Dr. Pedro Perez (Neurología)"
+                    await gateway.send_message(
+                        OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
+                    )
+                    state.add_message_to_history(incoming, "assistant", response_text)
+                    return {"status": "waiting_doctor_selection"}
 
             # Estado: eligiendo horario
             elif conversation.state == "scheduling":
@@ -134,15 +173,15 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                     conversation.selected_time = selected_slot["display"]
                     # Mover el slot seleccionado al principio para facilitar acceso después
                     conversation.proposed_times.insert(0, selected_slot)
-                    conversation.state = "choosing_office"
+                    conversation.state = "choosing_doctor"
                     state.set_appointment_conversation(incoming, conversation)
 
                     response_text = (
-                        f"Excelente! Entonces te veo {selected_slot['display']}.\n\n"
-                        f"¿En cuál consultorio prefieres tu cita?\n"
-                        f"1. Hospital Muguerza Alta Especialidad\n"
-                        f"2. Hospital Zambrano Hellion\n"
-                        f"3. IMSS"
+                        f"Excelente! Entonces te esperamos {selected_slot['display']}.\n\n"
+                        f"¿Con cuál doctor deseas agendar tu cita?\n"
+                        f"1. Dr. Jose Fernandez (Consultas Generales)\n"
+                        f"2. Dr. Juan Paredes (Pediatría)\n"
+                        f"3. Dr. Pedro Perez (Neurología)"
                     )
 
                     await gateway.send_message(
@@ -150,7 +189,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                     )
 
                     state.add_message_to_history(incoming, "assistant", response_text)
-                    return {"status": "waiting_office_selection"}
+                    return {"status": "waiting_doctor_selection"}
                 else:
                     response_text = "No entendí bien. Por favor elige el número de la opción que prefieres (1, 2, 3, etc.)"
                     await gateway.send_message(

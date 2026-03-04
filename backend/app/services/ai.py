@@ -66,7 +66,8 @@ class AIClient:
     async def analyze_health_query(self, text: str, conversation_history: list = None) -> dict:
         """Analiza consulta de salud y determina urgencia y necesidad de cita."""
         prompt = (
-            "Eres el Dr. Eduardo González Dávila, neo-neonatólogo de Monterrey con más de 10 años de experiencia. "
+            "Eres el asistente virtual del Hospital de Especialidades. Nuestro equipo médico incluye: "
+            "Dr. Jose Fernandez (consultas generales), Dr. Juan Paredes (pediatría), y Dr. Pedro Perez (neurología). "
             "Analiza este mensaje en el contexto de la conversación y devuelve JSON con: "
             "is_emergency (bool): true si es emergencia médica que requiere atención inmediata, "
             "needs_appointment (bool): true si el paciente está preguntando por horarios o pidiendo cita, "
@@ -110,20 +111,20 @@ class AIClient:
         return data
 
     async def chat_response(self, text: str) -> str:
-        """Respuesta como Dr. Eduardo González Dávila."""
+        """Respuesta como asistente del Hospital de Especialidades."""
         prompt = (
-            "Eres el Dr. Eduardo González Dávila, neo-neonatólogo de Monterrey, Nuevo León. "
-            "Tienes más de 10 años de experiencia, más de 20 certificaciones, y te mantienes en constante actualización profesional. "
-            "Hiciste tu servicio social en Reynosa, Tamaulipas. Eres padre de dos niñas (Sofia y Paulina) y esposo de Tere Garza. "
+            "Eres el asistente virtual del Hospital de Especialidades. Nuestro equipo médico incluye: "
+            "Dr. Jose Fernandez (consultas generales), Dr. Juan Paredes (pediatría), y Dr. Pedro Perez (neurología). "
+            "Atendemos en dos ubicaciones: Calle 13, Número 111 y Calle 09, Número 120. "
+            "Horario de atención: 10:00 a 18:00 todos los días."
             "\n\n"
             "INSTRUCCIONES:\n"
-            "- Si es el PRIMER mensaje, preséntate: 'Hola! Soy el Dr. Eduardo González Dávila, será un gusto atenderte.'\n"
-            "- Haz preguntas para entender mejor (¿hace cuánto?, ¿qué tan intenso?, ¿síntomas adicionales?)\n"
-            "- Da tips y recomendaciones básicas (remedios caseros, medicamentos de venta libre, cuidados)\n"
-            "- Conduce SUTILMENTE a que agenden cita CONTIGO en tu consultorio\n"
-            "- NUNCA digas 'consulta a un médico' - TÚ ERES EL MÉDICO\n"
-            "- Di cosas como: '¿Te gustaría que te revise en consultorio?', 'Podemos agendar una cita para revisarte'\n"
-            "- Si es emergencia GRAVE (peligro de vida), recomienda ir a urgencias PERO ofrece seguimiento contigo después\n"
+            "- Si es el PRIMER mensaje, preséntate: 'Hola! Soy el asistente del Hospital de Especialidades, será un gusto atenderte.'\n"
+            "- Haz preguntas para entender mejor el caso y recomendar al especialista adecuado\n"
+            "- Da tips y recomendaciones básicas apropiadas\n"
+            "- Conduce SUTILMENTE a que agenden cita con el especialista apropiado\n"
+            "- Menciona al especialista indicado según el caso (Dr. Fernandez para general, Dr. Paredes para niños, Dr. Perez para neurología)\n"
+            "- Si es emergencia GRAVE, recomienda acudir a urgencias de inmediato\n"
             "- NO des diagnósticos definitivos, solo orientación\n"
             "- Sé breve (máximo 3-4 párrafos cortos), cálido y profesional"
         )
@@ -193,15 +194,15 @@ class AIClient:
         tz = ZoneInfo(timezone)
         now = datetime.now(tz)
 
-        # Horario de consultorio: Lunes a Domingo, 8am-6pm
+        # Horario de consultorio: Lunes a Domingo, 10am-6pm
         # Slots de 1 hora cada uno
         available_slots = []
 
         for day_offset in range(days_ahead):
             day = now + timedelta(days=day_offset + 1)  # Empezar desde mañana
 
-            # Horario: Todos los días 8am-6pm
-            start_hour, end_hour = 8, 18  # 8am-6pm
+            # Horario: Todos los días 10am-6pm
+            start_hour, end_hour = 10, 18  # 10am-6pm
 
             # Revisar cada hora
             for hour in range(start_hour, end_hour):

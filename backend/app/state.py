@@ -19,11 +19,12 @@ class PendingEmailAction:
 class AppointmentConversation:
     """Trackea el estado de una conversación de agendamiento de cita."""
     patient_number: str
-    state: str = "initial"  # initial | diagnosing | offering_appointment | choosing_office | scheduling | confirming
+    state: str = "initial"  # initial | scheduling | choosing_doctor | choosing_office | confirming
     symptoms: Optional[str] = None
     proposed_times: list = field(default_factory=list)  # Lista de horarios propuestos
     selected_time: Optional[str] = None
-    selected_office: Optional[str] = None  # muguerza | zambrano | imss
+    selected_doctor: Optional[str] = None  # fernandez | paredes | perez
+    selected_office: Optional[str] = None  # calle13 | calle09
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_updated: datetime = field(default_factory=datetime.utcnow)
 

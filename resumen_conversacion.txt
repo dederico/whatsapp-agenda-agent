@@ -1,137 +1,185 @@
-RESUMEN DE CONVERSACIÓN - Bot de Consejero de Salud
-=====================================================
+RESUMEN DE CONVERSACIÓN - Bot de Consejero de Salud Dr. Eduardo González Dávila
+===================================================================================
 Fecha: 2026-02-01
 
 CONTEXTO
 --------
-El usuario solicitó configurar un BOT DE SALUD que:
-- Escucha TODOS los mensajes de WhatsApp automáticamente
-- Responde como consejero de salud profesional
-- Detecta emergencias e invita a llamar al doctor
-- Crea citas en Google Calendar automáticamente
+Sistema de agendamiento inteligente para consultas médicas neo-neonatología.
+El bot es el Dr. Eduardo González Dávila y gestiona citas automáticamente.
 
-ACCIONES REALIZADAS
--------------------
+IMPLEMENTACIONES COMPLETADAS
+-----------------------------
 
-1. MODIFICACIONES AL CÓDIGO
+1. FLUJO CONVERSACIONAL CON HISTORIAL (FASE 1)
+   - El bot actúa como Dr. Eduardo González Dávila, neo-neonatólogo
+   - Da consejos y tips de salud antes de sugerir cita
+   - Detecta emergencias y recomienda ir a urgencias
+   - Flujo gradual hacia agendamiento (no agresivo)
 
-   a) backend/app/services/ai.py:
-      - Agregada función analyze_health_query() que detecta:
-        * is_emergency: si es emergencia médica
-        * needs_appointment: si necesita cita con doctor
-        * urgency: nivel de urgencia (high/medium/low)
-        * suggested_response: respuesta empática sugerida
-      - Modificado chat_response() para actuar como consejero de salud profesional
+2. SISTEMA DE AGENDAMIENTO INTELIGENTE (FASE 2)
 
-   b) backend/app/routes/whatsapp.py:
-      - REMOVIDO filtro de owner (ahora acepta CUALQUIER número)
-      - REMOVIDA toda la lógica de comandos y correos electrónicos
-      - NUEVA lógica simple:
-        1. Analizar mensaje con analyze_health_query()
-        2. Si es emergencia → agregar mensaje urgente de llamar al doctor
-        3. Si necesita cita → crear evento automáticamente en Google Calendar (mañana 10am)
-        4. Responder automáticamente al usuario
-      - Bot completamente automático, sin intervención humana
+   a) Integración con Google Calendar:
+      - Revisa disponibilidad real antes de ofrecer horarios
+      - Evita doble-booking
+      - Horario: Lunes a Domingo, 8am-6pm (slots de 1 hora)
+      - Busca en ventana de 7 días
 
-2. LOGIN EN RENDER CON NUEVA CUENTA
-   - Se configuró un segundo perfil de Render CLI para mantener ambas cuentas
-   - Cuenta anterior: goldencoyotesnet@gmail.com (Golder)
-   - Cuenta nueva: developer@beholder.com.mx (Orakron)
-   - Se crearon 2 archivos de configuración:
-     * ~/.render/cli.yaml (cuenta Golder)
-     * ~/.render/cli-orakron.yaml (cuenta Orakron)
+   b) Flujo de negociación por WhatsApp:
+      1. Usuario expresa necesidad de cita o pregunta por horarios
+      2. Bot revisa Google Calendar automáticamente
+      3. Ofrece 3-5 horarios disponibles reales
+      4. Usuario elige número (1, 2, 3...)
+      5. Bot pregunta consultorio (Muguerza/Zambrano/IMSS)
+      6. Usuario elige consultorio
+      7. Bot crea evento en calendario y confirma
 
-2. VERIFICACIÓN DE SERVICIOS EXISTENTES
-   Los servicios ya estaban creados en la cuenta Orakron:
+   c) Consultorios disponibles:
+      - Hospital Muguerza Alta Especialidad
+      - Hospital Zambrano Hellion
+      - IMSS
 
-   a) Backend FastAPI:
-      - Nombre: Agente-Agenda-Calendario-Api
-      - Plan: starter ($7/mes) ✅
-      - URL: https://agente-agenda-calendario-api.onrender.com
-      - ID: srv-d5r9prm3jp1c73fio0g0
+3. HISTORIAL CONVERSACIONAL (FASE 3 - HOY)
 
-   b) WhatsApp Gateway (Node.js):
-      - Nombre: Agente-Agenda-Calendario
-      - Plan: standard ($25/mes) ✅
-      - URL: https://agente-agenda-calendario.onrender.com
-      - ID: srv-d5r9prm3jp1c73fio0b0
+   Problema detectado:
+   - El bot se presentaba en CADA mensaje: "Hola, soy el Dr. Eduardo González Dávila..."
+   - No tenía memoria de mensajes previos
+   - Cada mensaje se trataba como conversación nueva
 
-   c) PostgreSQL Database:
-      - Nombre: agente-personal-agenda-calendario
-      - Plan: free
-      - ID: dpg-d5r99kv5r7bs7392jovg-a
+   Solución implementada:
 
-3. DOCUMENTACIÓN CREADA
-   - CONFIGURACION.txt: Guía completa con:
-     * Información de servicios y cuentas
-     * Variables de entorno pendientes
-     * Pasos siguientes para configurar Google y OpenAI
-     * Comandos útiles
-     * Enlaces importantes
+   a) backend/app/state.py:
+      - Agregado: conversation_history: Dict[str, deque] = {}
+      - Métodos nuevos:
+        * add_message_to_history(patient_number, role, content)
+        * get_conversation_history(patient_number) -> list
+        * clear_conversation_history(patient_number)
+      - Mantiene últimos 20 mensajes por usuario
 
-   - render-orakron.sh: Script de ayuda para usar Render CLI con la cuenta Orakron
+   b) backend/app/services/ai.py:
+      - analyze_health_query() ahora recibe conversation_history
+      - Construye mensajes con historial completo para el LLM
+      - Prompt modificado:
+        * "SOLO preséntate si es el PRIMER mensaje del historial"
+        * "Si ya hay historial, NO repitas tu presentación"
+      - El modelo ahora tiene contexto completo de la conversación
 
-CUENTAS QUE NECESITA CREAR EL USUARIO
---------------------------------------
+   c) backend/app/routes/whatsapp.py:
+      - Guarda TODOS los mensajes (usuario y bot) en historial
+      - Pasa historial a analyze_health_query()
+      - Logging mejorado con traceback completo para debug
+      - Mejor detección de intención de agendar:
+        * Keywords: horario, disponible, cita, agendar, consulta, días de la semana, "puedes"
+        * Detecta preguntas como "En qué horarios estás disponible?"
+        * Detecta propuestas como "Mañana a las 10am puedes?"
 
-1. ✅ Render (ya configurado)
-   - Cuenta: developer@beholder.com.mx
-   - Servicios ya desplegados
+4. LOGGING Y DEBUG
+   - Agregado logging detallado en cada paso del proceso de calendario:
+     * calendar.check_start
+     * calendar.list_events_start
+     * calendar.list_events_success
+     * calendar.error (con traceback completo)
+   - Esto ayudará a identificar dónde falla el acceso a Google Calendar
 
-2. ⚠️  Google Cloud Console (PENDIENTE)
-   - Crear proyecto
-   - Habilitar Gmail API y Calendar API
-   - Crear credenciales OAuth 2.0
-   - Configurar redirect URI: https://agente-agenda-calendario-api.onrender.com/oauth/callback
-   - Obtener: GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET
+PROBLEMA DETECTADO (POR RESOLVER)
+----------------------------------
 
-3. ⚠️  OpenAI (PENDIENTE)
-   - Crear API Key en https://platform.openai.com/api-keys
-   - Obtener: OPENAI_API_KEY
+El usuario reportó error al revisar la agenda:
+"Disculpa, tuve un problema al revisar la agenda. ¿Podrías llamarme directamente?"
 
-4. ✅ WhatsApp (NO REQUIERE CUENTA NUEVA)
-   - Usa el número personal del usuario
-   - Solo escanear QR cuando esté configurado
+Posibles causas:
+1. OAuth token expirado o inválido
+2. Falta autenticación de Google OAuth
+3. Permisos de Calendar API no configurados
+4. Variables de entorno incorrectas
 
-5. ✅ PostgreSQL (ya creado en Render)
-   - Base de datos ya desplegada (plan free)
+El logging detallado que se agregó permitirá identificar exactamente dónde falla.
 
-VARIABLES DE ENTORNO PENDIENTES DE CONFIGURAR
-----------------------------------------------
+ARQUITECTURA TÉCNICA
+---------------------
 
-Backend:
-- API_KEY_INTERNAL (generar con uuidgen)
-- DATABASE_URL (obtener de Render PostgreSQL)
-- WHATSAPP_GATEWAY_URL=https://agente-agenda-calendario.onrender.com
-- WHATSAPP_GATEWAY_API_KEY (generar con uuidgen)
-- OWNER_WHATSAPP_NUMBER=+521XXXXXXXXXX
-- OPENAI_API_KEY (de OpenAI)
-- GOOGLE_CLIENT_ID (de Google Cloud)
-- GOOGLE_CLIENT_SECRET (de Google Cloud)
-- GOOGLE_REDIRECT_URI=https://agente-agenda-calendario-api.onrender.com/oauth/callback
+Servicios Render (cuenta developer@beholder.com.mx):
 
-WhatsApp Gateway:
-- API_KEY (mismo que WHATSAPP_GATEWAY_API_KEY del backend)
-- BACKEND_URL=https://agente-agenda-calendario-api.onrender.com
+1. Backend FastAPI (srv-d5r9prm3jp1c73fio0g0)
+   - Plan: starter ($7/mes)
+   - URL: https://agente-agenda-calendario-api.onrender.com
+   - Disco persistente: /var/data (1GB) para Google tokens
+   - Auto-deploy: activado desde branch main
 
-PRÓXIMOS PASOS
---------------
-1. Crear proyecto en Google Cloud Console y obtener credenciales OAuth
-2. Crear API Key de OpenAI
-3. Configurar todas las variables de entorno en Render Dashboard
-4. Autorizar OAuth de Google
-5. Escanear QR de WhatsApp
-6. Probar el sistema
+2. WhatsApp Gateway (srv-d5r9prm3jp1c73fio0b0)
+   - Plan: standard ($25/mes)
+   - URL: https://agente-agenda-calendario.onrender.com
+   - Disco persistente: /var/data (1GB) para sesión WhatsApp
+   - Auto-deploy: activado desde branch main
 
-ARCHIVOS DE AYUDA CREADOS
---------------------------
-- CONFIGURACION.txt: Documentación completa de configuración
-- render-orakron.sh: Script para usar Render CLI con cuenta Orakron
-- resumen_conversacion.txt: Este archivo
+3. PostgreSQL (dpg-d5r99kv5r7bs7392jovg-a)
+   - Plan: free
+   - Base: agente_personal_agenda_calendario
 
-USO DEL SCRIPT DE AYUDA
-------------------------
-# Desde la raíz del proyecto:
-./render-orakron.sh services list -o yaml
-./render-orakron.sh logs srv-d5r9prm3jp1c73fio0g0
-./render-orakron.sh whoami
+Variables de entorno configuradas:
+- GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
+- OPENAI_API_KEY
+- DATABASE_URL
+- WHATSAPP_GATEWAY_URL, WHATSAPP_GATEWAY_API_KEY
+- OWNER_WHATSAPP_NUMBER
+
+COMMITS RECIENTES
+-----------------
+1. fc974cc - feat: calendar-aware appointment scheduling
+2. b705d63 - feat: add conversation history and improve scheduling
+
+CAMBIOS IMPORTANTES - 2026-03-04
+----------------------------------
+ADAPTACIÓN PARA HOSPITAL DE ESPECIALIDADES (PRUEBAS HOY)
+
+1. CONTEXTO DEL BOT ACTUALIZADO:
+   - Cambió de: Dr. Eduardo González Dávila (neo-neonatólogo)
+   - A: Asistente Virtual del Hospital de Especialidades
+   - Ahora gestiona 3 doctores:
+     * Dr. Jose Fernandez (Consultas Generales)
+     * Dr. Juan Paredes (Pediatría)
+     * Dr. Pedro Perez (Neurología)
+
+2. UBICACIONES ACTUALIZADAS:
+   - Cambió de: Muguerza / Zambrano / IMSS
+   - A: 2 ubicaciones del hospital:
+     * Calle 13, Número 111
+     * Calle 09, Número 120
+
+3. HORARIOS MODIFICADOS:
+   - Cambió de: 8am-6pm
+   - A: 10am-6pm (10:00-18:00)
+
+4. FLUJO DE AGENDAMIENTO MEJORADO:
+   - Antes: Horario → Consultorio → Confirmar
+   - Ahora: Horario → Doctor → Ubicación → Confirmar
+   - Archivos modificados:
+     * backend/app/services/ai.py (prompts + horarios)
+     * backend/app/routes/whatsapp.py (flujo completo)
+     * backend/app/state.py (agregado selected_doctor)
+
+5. CREDENCIALES GOOGLE OAUTH CONFIGURADAS:
+   - Credenciales OAuth configuradas en Google Cloud Console
+   - Redirect URI: https://agente-agenda-calendario-api.onrender.com/oauth/callback
+   - Variables de entorno actualizadas en Render
+
+PRÓXIMOS PASOS (LANZAMIENTO HOY)
+---------------------------------
+1. Ejecutar flujo OAuth para autorizar Google Calendar
+2. Deploy a Render con los nuevos cambios
+3. Pruebas end-to-end del flujo completo
+4. Documentación básica para el hospital
+5. Plan de respaldo y trazabilidad
+
+ARQUITECTURA (SIN CAMBIOS)
+---------------------------
+- 3 servicios en Render:
+  * Agente-Agenda-Calendario-Api (FastAPI backend)
+  * Agente-Agenda-Calendario (WhatsApp Gateway Baileys)
+  * agente-personal-agenda-calendario (PostgreSQL)
+
+CAMBIOS PREVIOS CONSERVADOS
+----------------------------
+- El bot YA NO se presenta en cada mensaje
+- Mantiene contexto de conversación completa
+- Detecta mejor la intención de agendar citas
+- Logging detallado para debug de problemas
