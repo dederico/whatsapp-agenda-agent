@@ -65,7 +65,16 @@ class AIClient:
 
     async def analyze_health_query(self, text: str, conversation_history: list = None) -> dict:
         """Analiza consulta de salud y determina urgencia y necesidad de cita."""
+        from ..config import settings
+        tz = ZoneInfo(settings.scheduler_timezone)
+        now = datetime.now(tz)
+        day_names = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        month_names = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                       "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        current_date = f"{day_names[now.weekday()]} {now.day} de {month_names[now.month - 1]} del {now.year}"
+
         prompt = (
+            f"FECHA ACTUAL: {current_date}. "
             "Eres el asistente virtual del Hospital de Especialidades. Nuestro equipo médico incluye: "
             "Dr. Jose Fernandez (consultas generales), Dr. Juan Paredes (pediatría), y Dr. Pedro Perez (neurología). "
             "Analiza este mensaje en el contexto de la conversación y devuelve JSON con: "
@@ -112,7 +121,16 @@ class AIClient:
 
     async def extract_appointment_info(self, conversation_history: list) -> dict:
         """Extrae información de agendamiento de toda la conversación usando AI."""
+        from ..config import settings
+        tz = ZoneInfo(settings.scheduler_timezone)
+        now = datetime.now(tz)
+        day_names = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        month_names = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                       "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        current_date = f"{day_names[now.weekday()]} {now.day} de {month_names[now.month - 1]} del {now.year}"
+
         prompt = (
+            f"FECHA ACTUAL: {current_date}.\n\n"
             "Eres un asistente del Hospital de Especialidades. Analiza TODA la conversación y extrae información para agendar una cita.\n\n"
             "Doctores disponibles:\n"
             "- fernandez: Dr. Jose Fernandez (Consultas Generales) - para consultas generales de adultos\n"
@@ -279,9 +297,12 @@ class AIClient:
                 if not has_conflict:
                     # Formatear para el usuario
                     day_name = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"][day.weekday()]
+                    month_names = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                                   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+                    month_name = month_names[slot_start.month - 1]
                     available_slots.append({
                         "datetime": slot_start.isoformat(),
-                        "display": f"{day_name} {day.day} de {slot_start.strftime('%B')} a las {hour}:00",
+                        "display": f"{day_name} {day.day} de {month_name} a las {hour}:00",
                         "day": day_name,
                         "date": day.strftime("%Y-%m-%d"),
                         "time": f"{hour}:00"
