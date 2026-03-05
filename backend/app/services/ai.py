@@ -121,6 +121,47 @@ class AIClient:
             }
         return data
 
+    async def extract_datetime_request(self, conversation_history: list) -> dict:
+        """Extrae la fecha y hora específica que el usuario está pidiendo."""
+        from ..config import settings
+        tz = ZoneInfo(settings.scheduler_timezone)
+        now = datetime.now(tz)
+        day_names = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        month_names = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                       "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        current_date = f"{day_names[now.weekday()]} {now.day} de {month_names[now.month - 1]} del {now.year}"
+
+        prompt = (
+            f"FECHA ACTUAL: {current_date}.\n\n"
+            "Analiza la conversación y extrae la fecha y hora ESPECÍFICA que el usuario está pidiendo.\n\n"
+            "Devuelve JSON con:\n"
+            "- requested_date (str): fecha ISO (YYYY-MM-DD) que pidió, o null\n"
+            "- requested_time (str): hora en formato HH:MM (ej: '12:00', '14:30'), o null\n"
+            "- requested_day_name (str): nombre del día si lo mencionó (lunes/martes/etc), o null\n\n"
+            "Ejemplos:\n"
+            "- 'Viernes a las 12' → {requested_day_name: 'viernes', requested_time: '12:00'}\n"
+            "- 'Mañana 10am' → {requested_date: '<fecha de mañana>', requested_time: '10:00'}\n"
+            "- '6 de marzo' → {requested_date: '2026-03-06'}\n"
+            "Si no mencionó fecha/hora específica, devuelve null en esos campos."
+        )
+
+        messages = [{"role": "system", "content": prompt}]
+        if conversation_history:
+            for msg in conversation_history[-5:]:  # Solo últimos 5 mensajes
+                messages.append({"role": msg["role"], "content": msg["content"]})
+
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            response_format={"type": "json_object"},
+        )
+
+        raw = response.choices[0].message.content or "{}"
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return {"requested_date": None, "requested_time": None, "requested_day_name": None}
+
     async def extract_appointment_info(self, conversation_history: list) -> dict:
         """Extrae información de agendamiento de toda la conversación usando AI."""
         from ..config import settings
