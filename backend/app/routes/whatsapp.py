@@ -23,6 +23,9 @@ OFFICE_LOCATIONS = {
     "calle09": "Calle 09, Número 120",
 }
 
+# SOLUCIÓN MEDIA: Ubicación por defecto si no se especifica
+DEFAULT_OFFICE = "calle13"  # Sede principal
+
 
 def _normalize_number(raw: str) -> str:
     # Strip non-digits, keep number as-is for WhatsApp
@@ -96,17 +99,55 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
             state.set_appointment_conversation(incoming, conversation)
 
+            # SOLUCIÓN MEDIA: Si tiene doctor + horario pero falta ubicación → usar default
+            if conversation.selected_doctor and conversation.selected_time and not conversation.selected_office:
+                conversation.selected_office = DEFAULT_OFFICE
+                print(f"[USING DEFAULT OFFICE] {DEFAULT_OFFICE}")
+                state.set_appointment_conversation(incoming, conversation)
+
+            # SOLUCIÓN CORTA: Verificar qué falta y preguntar específicamente
+            missing = []
+            if not conversation.selected_doctor:
+                missing.append("doctor")
+            if not conversation.selected_office:
+                missing.append("ubicación")
+            if not conversation.selected_time:
+                missing.append("horario")
+
+            # Si falta algo, preguntar por el primer elemento faltante
+            if missing:
+                print(f"[MISSING INFO] Missing: {missing}")
+                if "doctor" in missing:
+                    doctor_options = "\n".join([f"- {DOCTORS[key]}" for key in DOCTORS.keys()])
+                    response_text = (
+                        f"Entiendo que necesitas una cita. ¿Con cuál de nuestros especialistas te gustaría agendar?\n\n"
+                        f"{doctor_options}"
+                    )
+                elif "ubicación" in missing:
+                    location_options = "\n".join([f"- {OFFICE_LOCATIONS[key]}" for key in OFFICE_LOCATIONS.keys()])
+                    response_text = (
+                        f"Perfecto! Tenemos tu cita con {DOCTORS[conversation.selected_doctor]}"
+                        f"{' para ' + conversation.selected_time if conversation.selected_time else ''}.\n\n"
+                        f"¿En cuál consultorio prefieres tu cita?\n\n{location_options}"
+                    )
+                elif "horario" in missing:
+                    response_text = (
+                        f"Excelente, te agendaré con {DOCTORS[conversation.selected_doctor]} "
+                        f"en {OFFICE_LOCATIONS[conversation.selected_office]}. "
+                        f"¿Qué día y horario prefieres? (Atendemos de 10:00 a 18:00)"
+                    )
+
+                await gateway.send_message(
+                    OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
+                )
+                state.add_message_to_history(incoming, "assistant", response_text)
+                return {"status": f"asking_{missing[0]}"}
+
             # Si ya tenemos TODO (doctor, ubicación, horario) → CREAR CITA
             if conversation.selected_doctor and conversation.selected_office and conversation.selected_time:
                 print(f"[CREATING APPOINTMENT] Doctor={conversation.selected_doctor} Location={conversation.selected_office} Time={conversation.selected_time}")
 
-                response_text = (
-                    f"Perfecto! He agendado tu cita con {DOCTORS[conversation.selected_doctor]} "
-                    f"para {conversation.selected_time} en {OFFICE_LOCATIONS[conversation.selected_office]}.\n\n"
-                    f"Te esperamos ese día. Si necesitas reagendar o tienes alguna duda, escríbeme."
-                )
-
-                # Crear evento en Google Calendar
+                # Crear evento en Google Calendar PRIMERO
                 try:
                     calendar = CalendarClient()
 
@@ -129,14 +170,32 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                         "description": f"Paciente: {incoming}\nDoctor: {DOCTORS[conversation.selected_doctor]}\nMotivo: {conversation.symptoms or 'No especificado'}",
                     }
 
-                    await calendar.create_event(event_payload)
+                    result = await calendar.create_event(event_payload)
+                    print(f"[CALENDAR SUCCESS] Event created: {result.get('id')}")
                     state.log_event("appointment.created", f"patient={incoming} doctor={conversation.selected_doctor} time={conversation.selected_time} office={conversation.selected_office}")
+
+                    # SOLO si Google Calendar respondió exitosamente → CONFIRMAR
+                    response_text = (
+                        f"✅ Perfecto! He agendado tu cita con {DOCTORS[conversation.selected_doctor]} "
+                        f"para {conversation.selected_time} en {OFFICE_LOCATIONS[conversation.selected_office]}.\n\n"
+                        f"Te esperamos ese día. Si necesitas reagendar o tienes alguna duda, escríbeme."
+                    )
 
                     # Limpiar conversación
                     state.clear_appointment_conversation(incoming)
+
                 except Exception as exc:
+                    import traceback
+                    error_detail = traceback.format_exc()
+                    print(f"[CALENDAR ERROR] {error_detail}")
                     state.log_event("appointment.error", f"patient={incoming} error={str(exc)}")
-                    response_text += "\n\n(Nota: Hubo un problema al crear el evento en el calendario, pero tu cita está confirmada)"
+
+                    # Si falla, NO confirmar la cita
+                    response_text = (
+                        f"Lo siento, tuve un problema al crear tu cita en el sistema. "
+                        f"Por favor intenta de nuevo o llámanos directamente al hospital. "
+                        f"Disculpa las molestias."
+                    )
 
                 await gateway.send_message(
                     OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)

@@ -88,7 +88,9 @@ class AIClient:
             "Haz preguntas diagnósticas cuando sea necesario. "
             "Da tips y recomendaciones básicas cuando sea apropiado. "
             "Conduce sutilmente hacia agendar cita, pero de manera natural y no agresiva. "
-            "Si es emergencia, recomienda FIRMEMENTE acudir a emergencias de inmediato."
+            "Si es emergencia, recomienda FIRMEMENTE acudir a emergencias de inmediato. "
+            "CRÍTICO: NUNCA digas que has agendado una cita. El sistema lo hace automáticamente cuando está listo. "
+            "Solo ofrece opciones, pregunta preferencias, o confirma disponibilidad."
         )
 
         # Construir mensajes con historial
@@ -137,17 +139,19 @@ class AIClient:
             "- paredes: Dr. Juan Paredes (Pediatría) - para niños, bebés, adolescentes\n"
             "- perez: Dr. Pedro Perez (Neurología) - para problemas neurológicos, dolores de cabeza, mareos\n\n"
             "Ubicaciones:\n"
-            "- calle13: Calle 13, Número 111 (zona centro)\n"
+            "- calle13: Calle 13, Número 111 (zona centro, sede principal - SE USA POR DEFECTO)\n"
             "- calle09: Calle 09, Número 120 (zona norte)\n\n"
             "Devuelve JSON con:\n"
             "- recommended_doctor (str): código del doctor apropiado según síntomas (fernandez/paredes/perez o null)\n"
             "- wants_appointment (bool): true si claramente quiere agendar cita\n"
-            "- preferred_location (str): código de ubicación si mencionó preferencia (calle13/calle09 o null)\n"
+            "- preferred_location (str): código de ubicación SOLO si mencionó EXPLÍCITAMENTE una preferencia (calle13/calle09 o null). "
+            "Si NO mencionó ubicación específica, devuelve null (se usará calle13 por defecto).\n"
             "- preferred_date_mention (str): si mencionó fecha ('mañana', 'lunes', fecha específica, o null)\n"
             "- symptoms_summary (str): resumen breve de síntomas/motivo (max 100 caracteres)\n"
             "- ready_to_offer_slots (bool): true si tiene suficiente info y quiere agendar\n"
             "- needs_clarification (str): qué información falta para agendar (o null si está todo)\n\n"
-            "IMPORTANTE: Analiza el contexto COMPLETO, no solo el último mensaje. Si ya identificaste doctor/ubicación en mensajes anteriores, mantenlos."
+            "IMPORTANTE: Analiza el contexto COMPLETO, no solo el último mensaje. Si ya identificaste doctor/ubicación en mensajes anteriores, mantenlos. "
+            "Si el paciente dice 'Calle 13' o 'la del centro', extrae 'calle13'. Si dice 'Calle 09' o 'la del norte', extrae 'calle09'."
         )
 
         messages = [{"role": "system", "content": prompt}]
