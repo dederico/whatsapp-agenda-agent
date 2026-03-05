@@ -240,3 +240,109 @@ COMPORTAMIENTO NUEVO:
 
 ARCHIVOS MODIFICADOS:
 - whatsapp-gateway/src/whatsapp.js (eliminó blocklist check)
+
+CAMBIOS MAYORES - 2026-03-04 (ÚLTIMAS HORAS)
+----------------------------------------------
+FLUJO CONVERSACIONAL DE FECHAS + FIX LOOP POST-BOOKING
+
+1. PROBLEMA: Búsqueda rígida de próximos 7 días
+   - Bot siempre buscaba próximos 7 días sin importar lo que pidiera el cliente
+   - Usuario: "Quisiera que fuera conversacional, y que una vez que el cliente
+     proponga fechas, haga la revisión de si existe o no"
+   - Cliente quería "Viernes a las 12" pero bot ofrecía lista genérica
+
+2. SOLUCIÓN: extract_datetime_request() - Búsqueda inteligente
+
+   a) Nueva función en backend/app/services/ai.py:
+      - Extrae fecha/hora ESPECÍFICA que el cliente está pidiendo
+      - Analiza últimos 5 mensajes del historial
+      - Devuelve JSON:
+        * requested_date: fecha ISO (YYYY-MM-DD)
+        * requested_time: hora en formato HH:MM
+        * requested_day_name: nombre del día (lunes/martes/etc)
+
+   b) Lógica de búsqueda adaptativa en backend/app/routes/whatsapp.py:
+      - Si pidió fecha específica → busca SOLO ese día
+      - Si pidió día de la semana → busca próximo día con ese nombre
+      - Si pidió hora específica → verifica si está disponible exactamente
+
+   c) Respuestas conversacionales:
+      - Encontró exacta: "¡Perfecto! Tengo disponible viernes 7 de marzo a las 12:00"
+      - Día correcto pero hora ocupada: "Lo siento, viernes a las 12:00 ya está ocupado.
+        Pero tengo otras opciones: 1. Viernes 10:00, 2. Viernes 14:00..."
+      - No disponible: Ofrece días cercanos
+
+3. PROBLEMA: Loop infinito después de agendar cita
+
+   Comportamiento detectado:
+   - Bot crea cita exitosamente
+   - Bot: "✅ Perfecto! He agendado tu cita con Dr. Jose Fernandez..."
+   - Usuario: "Gracias!"
+   - Bot INCORRECTAMENTE extrae wants_appointment=true del historial
+   - Bot inicia NUEVA búsqueda de citas
+   - Usuario: "como que el mismo se quedo en loop, no???"
+
+   Causa raíz:
+   - extract_appointment_info() analizaba TODO el historial
+   - Veía la discusión completa de la cita en el historial
+   - No distinguía entre "historial de cita completada" vs "nueva petición"
+   - "Gracias!" se interpretaba como continuación del flujo de agendamiento
+
+4. CONSIDERACIÓN IMPORTANTE DEL USUARIO:
+   - Usuario preguntó: "Pero si la quiere cancelar no afectaría???"
+   - Detectó que bloquear mecánicamente impediría CANCELAR/REAGENDAR
+   - Solución debe permitir cancelaciones y reagendamientos
+
+5. SOLUCIÓN FINAL: Prompt inteligente para post-booking
+
+   Modificación en backend/app/services/ai.py (extract_appointment_info):
+
+   Agregado al prompt:
+   "CRÍTICO - Detección de agradecimientos post-cita:
+   Si en el historial reciente hay una confirmación de cita (mensaje del
+   asistente con '✅' o 'He agendado tu cita') Y el mensaje actual del
+   usuario es SOLO un agradecimiento/despedida ('Gracias', 'Perfecto',
+   'Ok', 'Excelente', etc.), entonces wants_appointment=false y
+   ready_to_offer_slots=false.
+   PERO si el mensaje menciona CANCELAR, REAGENDAR, CAMBIAR FECHA, o
+   NUEVA CITA, entonces wants_appointment=true."
+
+   Ventajas de esta solución:
+   ✅ No bloquea mecánicamente (el cliente puede cancelar cuando quiera)
+   ✅ El LLM entiende contexto completo
+   ✅ Distingue agradecimiento vs intención real
+   ✅ Permite cancelar/reagendar inmediatamente después de agendar
+   ✅ Mantiene conversación natural
+
+COMMITS REALIZADOS
+------------------
+1. 1489c9b - feat: conversational datetime extraction
+   - Implementó extract_datetime_request()
+   - Búsqueda adaptativa según lo que pide el cliente
+   - Respuestas conversacionales para fechas exactas
+
+2. f5e3baf - fix: prevent appointment loop after booking
+   - Mejoró prompt de extract_appointment_info()
+   - Detecta agradecimientos post-booking
+   - Permite cancelaciones y reagendamientos
+
+ARCHIVOS MODIFICADOS HOY
+-------------------------
+- backend/app/services/ai.py:
+  * Nueva función extract_datetime_request() (líneas 124-163)
+  * Mejorado prompt de extract_appointment_info() (líneas 196-200)
+  * Nombres de meses en español en formateo de slots (líneas 280-291)
+
+- backend/app/routes/whatsapp.py:
+  * Búsqueda adaptativa de fechas (líneas 169-237)
+  * Respuestas conversacionales exactas (líneas 223-248)
+
+ESTADO ACTUAL
+-------------
+✅ Bot funciona 100% conversacional
+✅ Respeta lo que el cliente pide (no fuerza opciones)
+✅ Busca fechas específicas que el cliente solicita
+✅ No entra en loop después de agendar
+✅ Permite cancelar/reagendar en cualquier momento
+✅ Confirmación solo después de Google Calendar 200 OK
+✅ Todos los valores guardados para trazabilidad
