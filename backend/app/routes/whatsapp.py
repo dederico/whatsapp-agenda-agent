@@ -115,7 +115,10 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                         conversation.proposed_times.insert(0, slot)
                         print(f"[SAVED] Horario: {conversation.selected_time}")
                     else:
-                        print(f"[NO SLOT SELECTED] User rejected or asked for different date")
+                        # Usuario rechazó o pidió otra fecha → LIMPIAR slots para buscar nuevos
+                        print(f"[NO SLOT SELECTED] User rejected or asked for different date - clearing proposed_times")
+                        conversation.proposed_times = []
+                        state.set_appointment_conversation(incoming, conversation)
                 except Exception as e:
                     print(f"[ERROR] LLM slot selection failed: {e}")
 
