@@ -192,7 +192,12 @@ class AIClient:
             "- ready_to_offer_slots (bool): true si tiene suficiente info y quiere agendar\n"
             "- needs_clarification (str): qué información falta para agendar (o null si está todo)\n\n"
             "IMPORTANTE: Analiza el contexto COMPLETO, no solo el último mensaje. Si ya identificaste doctor/ubicación en mensajes anteriores, mantenlos. "
-            "Si el paciente dice 'Calle 13' o 'la del centro', extrae 'calle13'. Si dice 'Calle 09' o 'la del norte', extrae 'calle09'."
+            "Si el paciente dice 'Calle 13' o 'la del centro', extrae 'calle13'. Si dice 'Calle 09' o 'la del norte', extrae 'calle09'.\n\n"
+            "CRÍTICO - Detección de agradecimientos post-cita:\n"
+            "Si en el historial reciente hay una confirmación de cita (mensaje del asistente con '✅' o 'He agendado tu cita') "
+            "Y el mensaje actual del usuario es SOLO un agradecimiento/despedida ('Gracias', 'Perfecto', 'Ok', 'Excelente', etc.), "
+            "entonces wants_appointment=false y ready_to_offer_slots=false.\n"
+            "PERO si el mensaje menciona CANCELAR, REAGENDAR, CAMBIAR FECHA, o NUEVA CITA, entonces wants_appointment=true."
         )
 
         messages = [{"role": "system", "content": prompt}]

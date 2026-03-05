@@ -341,6 +341,7 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
                     # Limpiar conversación
                     state.clear_appointment_conversation(incoming)
+                    print(f"[CLEARED] Appointment conversation after successful booking")
 
                 except Exception as exc:
                     import traceback
