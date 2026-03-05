@@ -123,6 +123,11 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                         f"Entiendo que necesitas una cita. ¿Con cuál de nuestros especialistas te gustaría agendar?\n\n"
                         f"{doctor_options}"
                     )
+                    await gateway.send_message(
+                        OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
+                    )
+                    state.add_message_to_history(incoming, "assistant", response_text)
+                    return {"status": "asking_doctor"}
                 elif "ubicación" in missing:
                     location_options = "\n".join([f"- {OFFICE_LOCATIONS[key]}" for key in OFFICE_LOCATIONS.keys()])
                     response_text = (
@@ -130,18 +135,63 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                         f"{' para ' + conversation.selected_time if conversation.selected_time else ''}.\n\n"
                         f"¿En cuál consultorio prefieres tu cita?\n\n{location_options}"
                     )
-                elif "horario" in missing:
-                    response_text = (
-                        f"Excelente, te agendaré con {DOCTORS[conversation.selected_doctor]} "
-                        f"en {OFFICE_LOCATIONS[conversation.selected_office]}. "
-                        f"¿Qué día y horario prefieres? (Atendemos de 10:00 a 18:00)"
+                    await gateway.send_message(
+                        OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
                     )
+                    state.add_message_to_history(incoming, "assistant", response_text)
+                    return {"status": "asking_ubicación"}
+                elif "horario" in missing and not conversation.proposed_times:
+                    # Si falta horario Y no hemos ofrecido slots → OFRECER SLOTS del calendario
+                    print(f"[OFFERING SLOTS for missing horario]")
+                    try:
+                        calendar = CalendarClient()
+                        tz = ZoneInfo(settings.scheduler_timezone)
+                        now = datetime.now(tz)
+                        start_date = now
+                        end_date = now + timedelta(days=7)
 
-                await gateway.send_message(
-                    OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
-                )
-                state.add_message_to_history(incoming, "assistant", response_text)
-                return {"status": f"asking_{missing[0]}"}
+                        existing_events = await calendar.list_events(start_date, end_date)
+                        available_slots = await ai.suggest_available_slots(
+                            existing_events,
+                            settings.scheduler_timezone,
+                            days_ahead=7
+                        )
+
+                        if available_slots:
+                            conversation.proposed_times = available_slots[:5]
+                            state.set_appointment_conversation(incoming, conversation)
+
+                            doctor_text = f" con {DOCTORS[conversation.selected_doctor]}" if conversation.selected_doctor else ""
+                            location_text = f" en {OFFICE_LOCATIONS[conversation.selected_office]}" if conversation.selected_office else ""
+
+                            options_text = "Tengo disponibilidad en:\n\n"
+                            for idx, slot in enumerate(available_slots[:5], 1):
+                                options_text += f"{idx}. {slot['display']}\n"
+
+                            response_text = f"Perfecto{doctor_text}{location_text}. {options_text}\n¿Cuál horario prefieres?"
+
+                            await gateway.send_message(
+                                OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
+                            )
+                            state.add_message_to_history(incoming, "assistant", response_text)
+                            return {"status": "offered_slots"}
+                        else:
+                            response_text = "Déjame revisar mi agenda... Actualmente no tengo horarios disponibles en los próximos días. ¿Podrías llamarme directamente?"
+                            await gateway.send_message(
+                                OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
+                            )
+                            state.add_message_to_history(incoming, "assistant", response_text)
+                            return {"status": "no_slots"}
+
+                    except Exception as exc:
+                        import traceback
+                        print(f"[CALENDAR ERROR] {traceback.format_exc()}")
+                        response_text = "Disculpa, dame un momento para revisar mi agenda. Si es urgente, puedes llamarme directamente."
+                        await gateway.send_message(
+                            OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
+                        )
+                        state.add_message_to_history(incoming, "assistant", response_text)
+                        return {"status": "calendar_error"}
 
             # Si ya tenemos TODO (doctor, ubicación, horario) → CREAR CITA
             if conversation.selected_doctor and conversation.selected_office and conversation.selected_time:
