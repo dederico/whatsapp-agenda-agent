@@ -89,13 +89,35 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
 
             # Verificar si eligió horario de la lista propuesta
             if conversation.proposed_times and not conversation.selected_time:
-                # Usar AI para detectar si eligió un horario
-                for idx, slot in enumerate(conversation.proposed_times):
-                    if str(idx + 1) in text or slot['day'].lower() in text.lower():
+                # SOLUCIÓN: Usar LLM para detectar si REALMENTE eligió un horario (el cliente manda!)
+                selection_prompt = f"El usuario respondió: '{text}'\n\nOpciones disponibles:\n"
+                for idx, slot in enumerate(conversation.proposed_times, 1):
+                    selection_prompt += f"{idx}. {slot['display']}\n"
+                selection_prompt += (
+                    "\n¿El usuario ACEPTÓ una de estas opciones? "
+                    "Responde SOLO con el número (1-5) si aceptó. "
+                    "Si RECHAZÓ, pidió otra fecha, o no eligió ninguna, responde 'ninguna'."
+                )
+
+                try:
+                    selection_response = await ai.client.chat.completions.create(
+                        model=ai.model,
+                        messages=[{"role": "user", "content": selection_prompt}],
+                        max_tokens=10
+                    )
+                    selected_num = selection_response.choices[0].message.content.strip().lower()
+                    print(f"[LLM SLOT SELECTION] User: '{text}' → LLM: '{selected_num}'")
+
+                    if selected_num.isdigit() and 1 <= int(selected_num) <= len(conversation.proposed_times):
+                        idx = int(selected_num) - 1
+                        slot = conversation.proposed_times[idx]
                         conversation.selected_time = slot["display"]
                         conversation.proposed_times.insert(0, slot)
                         print(f"[SAVED] Horario: {conversation.selected_time}")
-                        break
+                    else:
+                        print(f"[NO SLOT SELECTED] User rejected or asked for different date")
+                except Exception as e:
+                    print(f"[ERROR] LLM slot selection failed: {e}")
 
             state.set_appointment_conversation(incoming, conversation)
 
