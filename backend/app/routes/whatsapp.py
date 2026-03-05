@@ -166,21 +166,75 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                     state.add_message_to_history(incoming, "assistant", response_text)
                     return {"status": "asking_ubicación"}
                 elif "horario" in missing and not conversation.proposed_times:
-                    # Si falta horario Y no hemos ofrecido slots → OFRECER SLOTS del calendario
-                    print(f"[OFFERING SLOTS for missing horario]")
+                    # FLUJO CONVERSACIONAL: Extraer fecha/hora que el usuario está pidiendo
+                    print(f"[EXTRACTING DATETIME REQUEST]")
+                    datetime_request = await ai.extract_datetime_request(history)
+                    print(f"[DATETIME REQUEST] {datetime_request}")
+
+                    # Si falta horario Y no hemos ofrecido slots → BUSCAR disponibilidad
+                    print(f"[CHECKING AVAILABILITY for requested datetime]")
                     try:
                         calendar = CalendarClient()
                         tz = ZoneInfo(settings.scheduler_timezone)
                         now = datetime.now(tz)
-                        start_date = now
-                        end_date = now + timedelta(days=7)
+
+                        # Determinar rango de búsqueda basado en lo que pidió el usuario
+                        if datetime_request.get('requested_date'):
+                            # Pidió fecha específica → buscar solo ese día
+                            search_date = datetime.fromisoformat(datetime_request['requested_date']).replace(tzinfo=tz)
+                            start_date = search_date
+                            end_date = search_date + timedelta(days=1)
+                            print(f"[SEARCHING SPECIFIC DATE] {datetime_request['requested_date']}")
+                        elif datetime_request.get('requested_day_name'):
+                            # Pidió día de la semana → buscar próximo día con ese nombre
+                            day_map = {"lunes": 0, "martes": 1, "miércoles": 2, "jueves": 3, "viernes": 4, "sábado": 5, "domingo": 6}
+                            requested_weekday = day_map.get(datetime_request['requested_day_name'].lower())
+                            if requested_weekday is not None:
+                                days_ahead = (requested_weekday - now.weekday()) % 7
+                                if days_ahead == 0:
+                                    days_ahead = 7  # Próxima semana si es hoy
+                                search_date = now + timedelta(days=days_ahead)
+                                start_date = search_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                                end_date = start_date + timedelta(days=1)
+                                print(f"[SEARCHING WEEKDAY] {datetime_request['requested_day_name']} → {search_date.strftime('%Y-%m-%d')}")
+                            else:
+                                # Fallback: buscar próximos 7 días
+                                start_date = now
+                                end_date = now + timedelta(days=7)
+                        else:
+                            # No especificó → buscar próximos 7 días
+                            start_date = now
+                            end_date = now + timedelta(days=7)
+
+                        # Ajustar para suggest_available_slots que usa "días desde hoy"
+                        # Si buscamos un día específico en el futuro, calcular días desde hoy
+                        if datetime_request.get('requested_date') or datetime_request.get('requested_day_name'):
+                            # Buscar solo ese día específico
+                            days_until = max(0, (start_date.replace(hour=0, minute=0, second=0, microsecond=0) - now.replace(hour=0, minute=0, second=0, microsecond=0)).days)
+                            days_range = 1
+                        else:
+                            # Búsqueda general de 7 días
+                            days_until = 0
+                            days_range = 7
 
                         existing_events = await calendar.list_events(start_date, end_date)
-                        available_slots = await ai.suggest_available_slots(
+
+                        # Filtrar slots para obtener solo el rango que nos interesa
+                        all_slots = await ai.suggest_available_slots(
                             existing_events,
                             settings.scheduler_timezone,
-                            days_ahead=7
+                            days_ahead=7  # Buscar en ventana amplia
                         )
+
+                        # Filtrar slots para el día específico si lo pidió
+                        if datetime_request.get('requested_date'):
+                            target_date = datetime_request['requested_date']
+                            available_slots = [s for s in all_slots if s['date'] == target_date]
+                        elif datetime_request.get('requested_day_name'):
+                            target_day = datetime_request['requested_day_name'].capitalize()
+                            available_slots = [s for s in all_slots if s['day'] == target_day]
+                        else:
+                            available_slots = all_slots
 
                         if available_slots:
                             conversation.proposed_times = available_slots[:5]
@@ -189,11 +243,32 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                             doctor_text = f" con {DOCTORS[conversation.selected_doctor]}" if conversation.selected_doctor else ""
                             location_text = f" en {OFFICE_LOCATIONS[conversation.selected_office]}" if conversation.selected_office else ""
 
-                            options_text = "Tengo disponibilidad en:\n\n"
-                            for idx, slot in enumerate(available_slots[:5], 1):
-                                options_text += f"{idx}. {slot['display']}\n"
-
-                            response_text = f"Perfecto{doctor_text}{location_text}. {options_text}\n¿Cuál horario prefieres?"
+                            # CONVERSACIONAL: Si pidió hora específica y la tenemos, confirmarla directamente
+                            requested_time = datetime_request.get('requested_time')
+                            if requested_time:
+                                # Buscar si tenemos exactamente esa hora
+                                exact_match = next((slot for slot in available_slots if slot['time'] == requested_time), None)
+                                if exact_match:
+                                    # ¡Encontramos exactamente lo que pidió!
+                                    response_text = (
+                                        f"¡Perfecto{doctor_text}{location_text}! "
+                                        f"Tengo disponible {exact_match['display']}. ¿Te parece bien ese horario?"
+                                    )
+                                else:
+                                    # Tenemos el día pero no esa hora específica
+                                    options_text = f"Para {datetime_request.get('requested_day_name', 'ese día')} tengo:\n\n"
+                                    for idx, slot in enumerate(available_slots[:5], 1):
+                                        options_text += f"{idx}. {slot['display']}\n"
+                                    response_text = (
+                                        f"Lo siento, {datetime_request.get('requested_day_name', 'ese día')} a las {requested_time} ya está ocupado. "
+                                        f"Pero tengo otras opciones:\n\n{options_text}\n¿Cuál te conviene?"
+                                    )
+                            else:
+                                # No pidió hora específica, mostrar opciones
+                                options_text = "Tengo disponibilidad en:\n\n"
+                                for idx, slot in enumerate(available_slots[:5], 1):
+                                    options_text += f"{idx}. {slot['display']}\n"
+                                response_text = f"Perfecto{doctor_text}{location_text}. {options_text}\n¿Cuál horario prefieres?"
 
                             await gateway.send_message(
                                 OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
@@ -201,7 +276,15 @@ async def whatsapp_incoming(message: IncomingWhatsAppMessage):
                             state.add_message_to_history(incoming, "assistant", response_text)
                             return {"status": "offered_slots"}
                         else:
-                            response_text = "Déjame revisar mi agenda... Actualmente no tengo horarios disponibles en los próximos días. ¿Podrías llamarme directamente?"
+                            # No hay disponibilidad para lo que pidió
+                            if datetime_request.get('requested_day_name') or datetime_request.get('requested_date'):
+                                day_text = datetime_request.get('requested_day_name', datetime_request.get('requested_date', 'ese día'))
+                                response_text = (
+                                    f"Lo siento, no tengo disponibilidad para {day_text}. "
+                                    f"¿Te gustaría que busque en otros días cercanos?"
+                                )
+                            else:
+                                response_text = "Déjame revisar mi agenda... Actualmente no tengo horarios disponibles en los próximos días. ¿Podrías llamarme directamente?"
                             await gateway.send_message(
                                 OutgoingWhatsAppMessage(to_number=message.from_number, text=response_text)
                             )
